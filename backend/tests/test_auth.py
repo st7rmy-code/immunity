@@ -148,6 +148,7 @@ def test_browser_session_cookie_and_csrf(client):
     sc = r.headers["set-cookie"].lower()
     assert "httponly" in sc and "samesite=strict" in sc and "path=/api" in sc
     assert client.get(API + "/users/me").json()["email"] == email  # cookie работает
+    assert client.get(API + "/auth/session").json()["user"]["email"] == email
     body = {"kind": "call", "scenario": "bank_safe", "result": "ok", "score": 1}
     r = client.post(API + "/attempts", json=body)
     assert r.status_code == 403 and r.json()["error"]["code"] == "csrf"
@@ -155,6 +156,8 @@ def test_browser_session_cookie_and_csrf(client):
     assert client.delete(API + "/auth/session").status_code == 204
     client.cookies.clear()
     assert client.get(API + "/users/me").status_code == 401
+    r = client.get(API + "/auth/session")
+    assert r.status_code == 200 and r.json() == {"user": None}
 
 
 def test_cookie_secure_by_default():

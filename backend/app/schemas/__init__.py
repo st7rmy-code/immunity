@@ -53,6 +53,10 @@ class UserOut(Out):
     created_at: datetime
 
 
+class SessionOut(BaseModel):
+    user: UserOut | None = Field(description="null — вход не выполнен")
+
+
 class UserPatch(In):
     display_name: Name | None = None
     audience: Slug | None = None

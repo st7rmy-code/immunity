@@ -286,6 +286,14 @@ const add = (rows, file) => rows.forEach(r => R.push(Object.assign({ file }, r))
     return before.n === after.n && before.last === after.last || JSON.stringify({ before, after });
   });
 
+  await T('Тренажёр', 'ответ «Да» распознаётся как согласие (кириллица и \\b)', async () => {
+    await p.evaluate(() => openSim('call', 'bank_safe')); await p.click('button[aria-label="Ответить"]'); await p.waitForTimeout(1100);
+    await p.fill('#phIn', 'Да'); await p.press('#phIn', 'Enter'); await p.waitForTimeout(150);
+    const k = await p.evaluate(() => { const x = SIM.last; stopSim(); return x; }); return k === 'comply' || 'намерение: ' + k;
+  });
+  await T('Голос', 'женская роль по отчеству (кириллица и \\b)', async () => p.evaluate(() =>
+    guessG('Ирина Петровна') === 'f' && guessG('Виктория Андреевна, банк') === 'f' && guessG('Павел Иванович') === 'm' || 'guessG'));
+
   // 12. Голос: ошибка MP3 обрабатывается один раз
   await T('Голос', 'ошибка MP3: одна замена голосом браузера, счётчик не уходит в минус', async () => p.evaluate(async () => {
     const spoken = []; const sp = window.speak; window.speak = (t) => { spoken.push(t); return false; };

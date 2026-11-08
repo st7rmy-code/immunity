@@ -55,9 +55,24 @@
 | PyTorch (только для генерации аудио) | BSD-3-Clause |
 | ffmpeg / LAME (кодирование MP3 при генерации) | LGPL/GPL — сам инструмент не распространяется, выходные файлы его лицензией не ограничены |
 
-## 5. Backend (будет дополнено при установке зависимостей)
+## 5. Зависимости новой версии
 
-FastAPI (MIT), Pydantic (MIT), SQLAlchemy (MIT), Alembic (MIT), psycopg (LGPL-3.0, используется как библиотека без изменений), PyJWT (MIT), passlib/bcrypt (BSD/Apache-2.0), pytest (MIT), httpx (BSD-3-Clause), uvicorn (BSD-3-Clause). Точный список с версиями — `backend/pyproject.toml`.
+Распространяются как библиотеки без изменений; точные версии — `backend/pyproject.toml` и `frontend/package-lock.json`.
+
+| Backend | Лицензия | Frontend | Лицензия |
+|---|---|---|---|
+| FastAPI, Starlette | MIT, BSD-3-Clause | React, React DOM | MIT |
+| Pydantic, pydantic-settings | MIT | React Router | MIT |
+| SQLAlchemy, Alembic | MIT | TanStack Query | MIT |
+| psycopg 3 | LGPL-3.0 (используется как библиотека) | Zustand | MIT |
+| PyJWT | MIT | Tailwind CSS | MIT |
+| bcrypt | Apache-2.0 | Vite, Vitest | MIT |
+| email-validator | Unlicense | TypeScript | Apache-2.0 |
+| uvicorn | BSD-3-Clause | Testing Library | MIT |
+| pytest, httpx (только тесты) | MIT, BSD-3-Clause | Playwright (только тесты) | Apache-2.0 |
+| | | openapi-typescript (только сборка) | MIT |
+
+Образы Docker: `python:3.13-slim`, `node:22-alpine` (только сборка), `nginx:1.27-alpine`, `postgres:16-alpine` — лицензии соответствующих проектов (PSF, MIT, BSD-2-Clause, PostgreSQL License).
 
 ## 6. Новости и статистика
 

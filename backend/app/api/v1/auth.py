@@ -4,12 +4,12 @@ from fastapi import APIRouter, Response, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from app.api.deps import DB, CurrentUser, audit
+from app.api.deps import DB, CurrentUser, OptionalUser, audit
 from app.core.config import get_settings
 from app.core.errors import ApiError
 from app.core.security import create_token, hash_password, password_problem, verify_password
 from app.models import Audience, User
-from app.schemas import LoginIn, PasswordChangeIn, RegisterIn, TokenOut, UserOut
+from app.schemas import LoginIn, PasswordChangeIn, RegisterIn, SessionOut, TokenOut, UserOut
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -72,6 +72,12 @@ def session_login(body: LoginIn, db: DB, response: Response):
     s = get_settings()
     response.set_cookie(s.cookie_name, token, max_age=ttl, httponly=True, secure=s.cookie_secure, samesite="strict", path="/api")
     return u
+
+
+@router.get("/session", response_model=SessionOut, summary="Кто вошёл (200 и null, если никто)",
+            description="Для интерфейса: проверка входа без ответа 401 в консоли браузера.")
+def session_state(u: OptionalUser):
+    return SessionOut(user=UserOut.model_validate(u) if u else None)
 
 
 @router.delete("/session", status_code=204, summary="Выйти в этом браузере")

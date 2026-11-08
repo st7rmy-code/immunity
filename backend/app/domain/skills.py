@@ -77,7 +77,9 @@ def overall(states: dict[str, State]) -> dict | None:
 
 
 def status(st: State) -> str:
-    if st.n < 1:
+    # порог тот же, что у индекса (0.5): тема либо входит в индекс и имеет статус, либо «мало данных».
+    # В прототипе здесь было 1, из-за чего индекс показывался при «мало данных» по всем темам.
+    if st.n < 0.5:
         return "little_data"
     if st.mean < 0.55:
         return "weak"

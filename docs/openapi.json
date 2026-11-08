@@ -1,0 +1,2296 @@
+{
+ "openapi": "3.1.0",
+ "info": {
+  "title": "Иммунитет к мошенникам — API",
+  "description": "Модульный монолит MVP. ИИ-функции на сервере не подключены (нет AI Gateway).",
+  "version": "0.1.0"
+ },
+ "paths": {
+  "/api/v1/auth/register": {
+   "post": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Регистрация",
+    "operationId": "register_api_v1_auth_register_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/RegisterIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/UserOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/auth/login": {
+   "post": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Вход для API-клиентов: токен в ответе",
+    "operationId": "login_api_v1_auth_login_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/LoginIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/TokenOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/auth/session": {
+   "get": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Кто вошёл (200 и null, если никто)",
+    "description": "Для интерфейса: проверка входа без ответа 401 в консоли браузера.",
+    "operationId": "session_state_api_v1_auth_session_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SessionOut"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   },
+   "post": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Вход для браузера: токен в httpOnly-cookie",
+    "description": "JavaScript страницы токен не видит. Изменяющие запросы с cookie требуют заголовок X-Immunity-CSRF: 1.",
+    "operationId": "session_login_api_v1_auth_session_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/LoginIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/UserOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Выйти в этом браузере",
+    "operationId": "session_logout_api_v1_auth_session_delete",
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     }
+    }
+   }
+  },
+  "/api/v1/auth/password": {
+   "post": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Смена пароля (все старые токены перестают действовать)",
+    "operationId": "change_password_api_v1_auth_password_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PasswordChangeIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/v1/auth/logout-all": {
+   "post": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Выйти на всех устройствах",
+    "operationId": "logout_all_api_v1_auth_logout_all_post",
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/v1/users/me": {
+   "get": {
+    "tags": [
+     "users"
+    ],
+    "summary": "Профиль текущего пользователя",
+    "operationId": "me_api_v1_users_me_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/UserOut"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   },
+   "delete": {
+    "tags": [
+     "users"
+    ],
+    "summary": "Удалить аккаунт и все свои данные",
+    "operationId": "delete_me_api_v1_users_me_delete",
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   },
+   "patch": {
+    "tags": [
+     "users"
+    ],
+    "summary": "Изменить профиль",
+    "operationId": "patch_me_api_v1_users_me_patch",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/UserPatch"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/UserOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/v1/users/me/import": {
+   "post": {
+    "tags": [
+     "users"
+    ],
+    "summary": "Перенести прогресс из файла экспорта прототипа",
+    "operationId": "import_progress_api_v1_users_me_import_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ImportIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ImportOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/v1/guides": {
+   "get": {
+    "tags": [
+     "content"
+    ],
+    "summary": "Памятки: «если уже попались», законы, настройки защиты",
+    "description": "Справочный контент из прототипа. У правовых утверждений — источник и дата проверки.",
+    "operationId": "guides_api_v1_guides_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Guides Api V1 Guides Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/skills": {
+   "get": {
+    "tags": [
+     "content"
+    ],
+    "summary": "Навыки (темы)",
+    "operationId": "skills_api_v1_skills_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/SkillRef"
+         },
+         "type": "array",
+         "title": "Response Skills Api V1 Skills Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/audiences": {
+   "get": {
+    "tags": [
+     "content"
+    ],
+    "summary": "Аудитории",
+    "operationId": "audiences_api_v1_audiences_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "additionalProperties": true,
+          "type": "object"
+         },
+         "type": "array",
+         "title": "Response Audiences Api V1 Audiences Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/scenarios": {
+   "get": {
+    "tags": [
+     "content"
+    ],
+    "summary": "Сценарии тренировок",
+    "description": "Список без ответов: признак «честный/мошеннический» в списке не раскрывается.",
+    "operationId": "scenarios_api_v1_scenarios_get",
+    "parameters": [
+     {
+      "name": "kind",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "enum": [
+          "call",
+          "chat",
+          "site",
+          "card",
+          "item"
+         ],
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Kind"
+      }
+     },
+     {
+      "name": "skill",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "maxLength": 32
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Skill"
+      }
+     },
+     {
+      "name": "audience",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "maxLength": 20
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Audience"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/ScenarioBrief"
+         },
+         "title": "Response Scenarios Api V1 Scenarios Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/scenarios/{kind}/{slug}": {
+   "get": {
+    "tags": [
+     "content"
+    ],
+    "summary": "Сценарий целиком",
+    "description": "Содержимое для движка тренажёра. Движок работает в браузере, поэтому ответы в нём есть: для обучения это допустимо, для аттестации — нет.",
+    "operationId": "scenario_api_v1_scenarios__kind___slug__get",
+    "parameters": [
+     {
+      "name": "kind",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "enum": [
+        "call",
+        "chat",
+        "site",
+        "card",
+        "item"
+       ],
+       "type": "string",
+       "title": "Kind"
+      }
+     },
+     {
+      "name": "slug",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Slug"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ScenarioDetail"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/attempts": {
+   "post": {
+    "tags": [
+     "training"
+    ],
+    "summary": "Сохранить результат тренировки",
+    "description": "Навык, сложность и признак честного сценария берутся из базы, а не из запроса.",
+    "operationId": "create_attempt_api_v1_attempts_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AttemptIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AttemptOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "get": {
+    "tags": [
+     "training"
+    ],
+    "summary": "История своих тренировок (новые сверху)",
+    "operationId": "list_attempts_api_v1_attempts_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 200,
+       "minimum": 1,
+       "default": 50,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "offset",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 100000,
+       "minimum": 0,
+       "default": 0,
+       "title": "Offset"
+      }
+     },
+     {
+      "name": "kind",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "enum": [
+          "call",
+          "chat",
+          "site",
+          "card",
+          "item"
+         ],
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Kind"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Page_AttemptOut_"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/skills/me": {
+   "get": {
+    "tags": [
+     "training"
+    ],
+    "summary": "Оценка навыков и индекс по своим попыткам",
+    "operationId": "my_skills_api_v1_skills_me_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SkillsOut"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/v1/threat-checks": {
+   "post": {
+    "tags": [
+     "protection"
+    ],
+    "summary": "Проверить сообщение, ссылку или письмо правилами",
+    "description": "Без ИИ: AI Gateway ещё не подключён. Исходный текст не сохраняется — для вошедшего пользователя в историю пишутся только тип, уровень риска, коды признаков и длина текста.",
+    "operationId": "threat_check_api_v1_threat_checks_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ThreatCheckIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ThreatCheckOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/v1/organizations": {
+   "post": {
+    "tags": [
+     "organizations"
+    ],
+    "summary": "Создать организацию (admin)",
+    "operationId": "create_org_api_v1_organizations_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/OrgIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/OrgOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/v1/organizations/{org_id}/members": {
+   "post": {
+    "tags": [
+     "organizations"
+    ],
+    "summary": "Добавить зарегистрированного пользователя в организацию",
+    "description": "Согласие на сводку (share_with_org) при этом не включается: его даёт сам пользователь.",
+    "operationId": "add_member_api_v1_organizations__org_id__members_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "org_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Org Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/MemberIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/MemberOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/organizations/{org_id}/summary": {
+   "get": {
+    "tags": [
+     "organizations"
+    ],
+    "summary": "Обезличенная сводка по навыкам",
+    "operationId": "summary_api_v1_organizations__org_id__summary_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "org_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Org Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/OrgSummary"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/health": {
+   "get": {
+    "tags": [
+     "system"
+    ],
+    "summary": "Состояние сервиса",
+    "operationId": "health_api_v1_health_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Health"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ "components": {
+  "schemas": {
+   "AttemptIn": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "enum": [
+       "call",
+       "chat",
+       "site",
+       "card",
+       "item"
+      ],
+      "title": "Kind"
+     },
+     "scenario": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]{1,48}$",
+      "title": "Scenario"
+     },
+     "result": {
+      "type": "string",
+      "enum": [
+       "ok",
+       "warn",
+       "bad"
+      ],
+      "title": "Result"
+     },
+     "score": {
+      "type": "number",
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Score"
+     },
+     "markers": {
+      "items": {
+       "type": "string",
+       "pattern": "^[a-z0-9_]{1,48}$"
+      },
+      "type": "array",
+      "maxItems": 6,
+      "title": "Markers"
+     },
+     "duration_ms": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "exclusiveMaximum": 3600000.0,
+        "exclusiveMinimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Duration Ms"
+     },
+     "phase": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "pre",
+         "post"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Phase"
+     },
+     "false_positive": {
+      "type": "boolean",
+      "title": "False Positive",
+      "default": false
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "kind",
+     "scenario",
+     "result",
+     "score"
+    ],
+    "title": "AttemptIn"
+   },
+   "AttemptOut": {
+    "properties": {
+     "id": {
+      "type": "integer",
+      "title": "Id"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "call",
+       "chat",
+       "site",
+       "card",
+       "item"
+      ],
+      "title": "Kind"
+     },
+     "scenario": {
+      "type": "string",
+      "title": "Scenario"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "skill": {
+      "type": "string",
+      "title": "Skill"
+     },
+     "level": {
+      "type": "integer",
+      "title": "Level"
+     },
+     "result": {
+      "type": "string",
+      "enum": [
+       "ok",
+       "warn",
+       "bad"
+      ],
+      "title": "Result"
+     },
+     "score": {
+      "type": "number",
+      "title": "Score"
+     },
+     "markers": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Markers"
+     },
+     "duration_ms": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Duration Ms"
+     },
+     "phase": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Phase"
+     },
+     "legit": {
+      "type": "boolean",
+      "title": "Legit"
+     },
+     "false_positive": {
+      "type": "boolean",
+      "title": "False Positive"
+     },
+     "source": {
+      "type": "string",
+      "title": "Source"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "kind",
+     "scenario",
+     "title",
+     "skill",
+     "level",
+     "result",
+     "score",
+     "markers",
+     "duration_ms",
+     "phase",
+     "legit",
+     "false_positive",
+     "source",
+     "created_at"
+    ],
+    "title": "AttemptOut"
+   },
+   "HTTPValidationError": {
+    "properties": {
+     "detail": {
+      "items": {
+       "$ref": "#/components/schemas/ValidationError"
+      },
+      "type": "array",
+      "title": "Detail"
+     }
+    },
+    "type": "object",
+    "title": "HTTPValidationError"
+   },
+   "Health": {
+    "properties": {
+     "status": {
+      "type": "string",
+      "enum": [
+       "ok",
+       "degraded"
+      ],
+      "title": "Status"
+     },
+     "db": {
+      "type": "boolean",
+      "title": "Db"
+     },
+     "ai": {
+      "type": "boolean",
+      "title": "Ai",
+      "description": "AI Gateway не подключён: ИИ-функции на сервере недоступны",
+      "default": false
+     },
+     "version": {
+      "type": "string",
+      "title": "Version"
+     }
+    },
+    "type": "object",
+    "required": [
+     "status",
+     "db",
+     "version"
+    ],
+    "title": "Health"
+   },
+   "ImportIn": {
+    "properties": {
+     "app": {
+      "type": "string",
+      "const": "immunitet",
+      "title": "App"
+     },
+     "v": {
+      "type": "integer",
+      "const": 2,
+      "title": "V"
+     },
+     "exported": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 40
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Exported"
+     },
+     "data": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Data"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "app",
+     "v",
+     "data"
+    ],
+    "title": "ImportIn",
+    "description": "Файл экспорта прототипа (формат immunitet v2). Поле data проверяется отдельно, как в Store.sanitize()."
+   },
+   "ImportOut": {
+    "properties": {
+     "imported": {
+      "type": "integer",
+      "title": "Imported"
+     },
+     "skipped": {
+      "type": "integer",
+      "title": "Skipped"
+     },
+     "reasons": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "type": "object",
+      "title": "Reasons"
+     }
+    },
+    "type": "object",
+    "required": [
+     "imported",
+     "skipped",
+     "reasons"
+    ],
+    "title": "ImportOut"
+   },
+   "IndexOut": {
+    "properties": {
+     "value": {
+      "type": "integer",
+      "maximum": 100.0,
+      "minimum": 0.0,
+      "title": "Value"
+     },
+     "pm": {
+      "type": "integer",
+      "title": "Pm"
+     },
+     "coverage": {
+      "type": "integer",
+      "title": "Coverage"
+     }
+    },
+    "type": "object",
+    "required": [
+     "value",
+     "pm",
+     "coverage"
+    ],
+    "title": "IndexOut"
+   },
+   "Indicator": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "tier": {
+      "type": "string",
+      "enum": [
+       "weak",
+       "medium",
+       "strong",
+       "critical"
+      ],
+      "title": "Tier"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "quote": {
+      "type": "string",
+      "title": "Quote"
+     },
+     "explanation": {
+      "type": "string",
+      "title": "Explanation"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "tier",
+     "title",
+     "quote",
+     "explanation"
+    ],
+    "title": "Indicator"
+   },
+   "LoginIn": {
+    "properties": {
+     "email": {
+      "type": "string",
+      "format": "email",
+      "title": "Email"
+     },
+     "password": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Password"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "email",
+     "password"
+    ],
+    "title": "LoginIn"
+   },
+   "MemberIn": {
+    "properties": {
+     "email": {
+      "type": "string",
+      "format": "email",
+      "title": "Email"
+     },
+     "role": {
+      "type": "string",
+      "enum": [
+       "learner",
+       "teacher",
+       "org_admin"
+      ],
+      "title": "Role",
+      "default": "learner"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "email"
+    ],
+    "title": "MemberIn"
+   },
+   "MemberOut": {
+    "properties": {
+     "user_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "User Id"
+     },
+     "role": {
+      "type": "string",
+      "enum": [
+       "learner",
+       "teacher",
+       "org_admin",
+       "admin"
+      ],
+      "title": "Role"
+     },
+     "organization_id": {
+      "type": "integer",
+      "title": "Organization Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "user_id",
+     "role",
+     "organization_id"
+    ],
+    "title": "MemberOut"
+   },
+   "OrgIn": {
+    "properties": {
+     "name": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 2,
+      "title": "Name"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "school",
+       "university",
+       "bank",
+       "company",
+       "public",
+       "other"
+      ],
+      "title": "Kind",
+      "default": "other"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "name"
+    ],
+    "title": "OrgIn"
+   },
+   "OrgOut": {
+    "properties": {
+     "id": {
+      "type": "integer",
+      "title": "Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "kind": {
+      "type": "string",
+      "title": "Kind"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "name",
+     "kind",
+     "created_at"
+    ],
+    "title": "OrgOut"
+   },
+   "OrgSkill": {
+    "properties": {
+     "skill": {
+      "type": "string",
+      "title": "Skill"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "mean": {
+      "type": "number",
+      "title": "Mean"
+     },
+     "learners": {
+      "type": "integer",
+      "title": "Learners"
+     }
+    },
+    "type": "object",
+    "required": [
+     "skill",
+     "title",
+     "mean",
+     "learners"
+    ],
+    "title": "OrgSkill"
+   },
+   "OrgSummary": {
+    "properties": {
+     "organization": {
+      "$ref": "#/components/schemas/OrgOut"
+     },
+     "members_total": {
+      "type": "integer",
+      "title": "Members Total"
+     },
+     "members_sharing": {
+      "type": "integer",
+      "title": "Members Sharing"
+     },
+     "min_group": {
+      "type": "integer",
+      "title": "Min Group"
+     },
+     "enough_data": {
+      "type": "boolean",
+      "title": "Enough Data"
+     },
+     "skills": {
+      "items": {
+       "$ref": "#/components/schemas/OrgSkill"
+      },
+      "type": "array",
+      "title": "Skills"
+     },
+     "attempts_30d": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Attempts 30D"
+     },
+     "note": {
+      "type": "string",
+      "title": "Note"
+     }
+    },
+    "type": "object",
+    "required": [
+     "organization",
+     "members_total",
+     "members_sharing",
+     "min_group",
+     "enough_data",
+     "skills",
+     "attempts_30d",
+     "note"
+    ],
+    "title": "OrgSummary"
+   },
+   "Page_AttemptOut_": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/AttemptOut"
+      },
+      "type": "array",
+      "title": "Items"
+     },
+     "total": {
+      "type": "integer",
+      "title": "Total"
+     },
+     "limit": {
+      "type": "integer",
+      "title": "Limit"
+     },
+     "offset": {
+      "type": "integer",
+      "title": "Offset"
+     }
+    },
+    "type": "object",
+    "required": [
+     "items",
+     "total",
+     "limit",
+     "offset"
+    ],
+    "title": "Page[AttemptOut]"
+   },
+   "PasswordChangeIn": {
+    "properties": {
+     "current_password": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Current Password"
+     },
+     "new_password": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "New Password"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "current_password",
+     "new_password"
+    ],
+    "title": "PasswordChangeIn"
+   },
+   "RegisterIn": {
+    "properties": {
+     "email": {
+      "type": "string",
+      "format": "email",
+      "title": "Email"
+     },
+     "password": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Password"
+     },
+     "display_name": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 80,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Display Name"
+     },
+     "audience": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^[a-z0-9_]{1,48}$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Audience"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "email",
+     "password"
+    ],
+    "title": "RegisterIn"
+   },
+   "ScenarioBrief": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "enum": [
+       "call",
+       "chat",
+       "site",
+       "card",
+       "item"
+      ],
+      "title": "Kind"
+     },
+     "slug": {
+      "type": "string",
+      "title": "Slug"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "skill": {
+      "type": "string",
+      "title": "Skill"
+     },
+     "level": {
+      "type": "integer",
+      "title": "Level"
+     },
+     "audiences": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Audiences"
+     },
+     "has_audio": {
+      "type": "boolean",
+      "title": "Has Audio"
+     }
+    },
+    "type": "object",
+    "required": [
+     "kind",
+     "slug",
+     "title",
+     "skill",
+     "level",
+     "audiences",
+     "has_audio"
+    ],
+    "title": "ScenarioBrief"
+   },
+   "ScenarioDetail": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "enum": [
+       "call",
+       "chat",
+       "site",
+       "card",
+       "item"
+      ],
+      "title": "Kind"
+     },
+     "slug": {
+      "type": "string",
+      "title": "Slug"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "skill": {
+      "type": "string",
+      "title": "Skill"
+     },
+     "level": {
+      "type": "integer",
+      "title": "Level"
+     },
+     "audiences": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Audiences"
+     },
+     "has_audio": {
+      "type": "boolean",
+      "title": "Has Audio"
+     },
+     "markers": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Markers"
+     },
+     "content": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Content"
+     },
+     "lines": {
+      "items": {
+       "$ref": "#/components/schemas/ScenarioLineOut"
+      },
+      "type": "array",
+      "title": "Lines"
+     }
+    },
+    "type": "object",
+    "required": [
+     "kind",
+     "slug",
+     "title",
+     "skill",
+     "level",
+     "audiences",
+     "has_audio",
+     "markers",
+     "content",
+     "lines"
+    ],
+    "title": "ScenarioDetail"
+   },
+   "ScenarioLineOut": {
+    "properties": {
+     "position": {
+      "type": "integer",
+      "title": "Position"
+     },
+     "text": {
+      "type": "string",
+      "title": "Text"
+     },
+     "speaker": {
+      "type": "string",
+      "title": "Speaker"
+     },
+     "audio_url": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Audio Url"
+     },
+     "duration_s": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Duration S"
+     }
+    },
+    "type": "object",
+    "required": [
+     "position",
+     "text",
+     "speaker",
+     "audio_url",
+     "duration_s"
+    ],
+    "title": "ScenarioLineOut"
+   },
+   "SessionOut": {
+    "properties": {
+     "user": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/UserOut"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "null — вход не выполнен"
+     }
+    },
+    "type": "object",
+    "required": [
+     "user"
+    ],
+    "title": "SessionOut"
+   },
+   "SkillRef": {
+    "properties": {
+     "slug": {
+      "type": "string",
+      "title": "Slug"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "description": {
+      "type": "string",
+      "title": "Description"
+     }
+    },
+    "type": "object",
+    "required": [
+     "slug",
+     "title",
+     "description"
+    ],
+    "title": "SkillRef"
+   },
+   "SkillState": {
+    "properties": {
+     "skill": {
+      "type": "string",
+      "title": "Skill"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "mean": {
+      "type": "number",
+      "title": "Mean",
+      "description": "Оценка навыка 0…1 (бета-апостериорное среднее)"
+     },
+     "sd": {
+      "type": "number",
+      "title": "Sd"
+     },
+     "evidence": {
+      "type": "number",
+      "title": "Evidence",
+      "description": "Вес свидетельств с учётом новизны и давности"
+     },
+     "attempts": {
+      "type": "integer",
+      "title": "Attempts"
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "little_data",
+       "weak",
+       "medium",
+       "strong"
+      ],
+      "title": "Status"
+     }
+    },
+    "type": "object",
+    "required": [
+     "skill",
+     "title",
+     "mean",
+     "sd",
+     "evidence",
+     "attempts",
+     "status"
+    ],
+    "title": "SkillState"
+   },
+   "SkillsOut": {
+    "properties": {
+     "skills": {
+      "items": {
+       "$ref": "#/components/schemas/SkillState"
+      },
+      "type": "array",
+      "title": "Skills"
+     },
+     "index": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/IndexOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "note": {
+      "type": "string",
+      "title": "Note"
+     }
+    },
+    "type": "object",
+    "required": [
+     "skills",
+     "index",
+     "note"
+    ],
+    "title": "SkillsOut"
+   },
+   "ThreatCheckIn": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "enum": [
+       "msg",
+       "url",
+       "mail"
+      ],
+      "title": "Kind"
+     },
+     "text": {
+      "type": "string",
+      "maxLength": 10000,
+      "title": "Text",
+      "default": ""
+     },
+     "url": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 2048
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Url"
+     },
+     "sender": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 320
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Sender"
+     },
+     "subject": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 300
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Subject"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "kind"
+    ],
+    "title": "ThreatCheckIn"
+   },
+   "ThreatCheckOut": {
+    "properties": {
+     "risk_level": {
+      "type": "string",
+      "enum": [
+       "unknown",
+       "low",
+       "medium",
+       "high",
+       "critical"
+      ],
+      "title": "Risk Level"
+     },
+     "confidence": {
+      "type": "null",
+      "title": "Confidence",
+      "description": "Для правил процент уверенности не считается: он не откалиброван"
+     },
+     "strength": {
+      "type": "string",
+      "title": "Strength"
+     },
+     "detected_indicators": {
+      "items": {
+       "$ref": "#/components/schemas/Indicator"
+      },
+      "type": "array",
+      "title": "Detected Indicators"
+     },
+     "explanation": {
+      "type": "string",
+      "title": "Explanation"
+     },
+     "limitations": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Limitations"
+     },
+     "recommended_actions": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Recommended Actions"
+     },
+     "avoid_actions": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Avoid Actions"
+     },
+     "engine": {
+      "type": "string",
+      "title": "Engine"
+     },
+     "stored": {
+      "type": "boolean",
+      "title": "Stored"
+     }
+    },
+    "type": "object",
+    "required": [
+     "risk_level",
+     "strength",
+     "detected_indicators",
+     "explanation",
+     "limitations",
+     "recommended_actions",
+     "avoid_actions",
+     "engine",
+     "stored"
+    ],
+    "title": "ThreatCheckOut"
+   },
+   "TokenOut": {
+    "properties": {
+     "access_token": {
+      "type": "string",
+      "title": "Access Token"
+     },
+     "token_type": {
+      "type": "string",
+      "const": "bearer",
+      "title": "Token Type",
+      "default": "bearer"
+     },
+     "expires_in": {
+      "type": "integer",
+      "title": "Expires In"
+     }
+    },
+    "type": "object",
+    "required": [
+     "access_token",
+     "expires_in"
+    ],
+    "title": "TokenOut"
+   },
+   "UserOut": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "email": {
+      "type": "string",
+      "title": "Email"
+     },
+     "display_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Display Name"
+     },
+     "role": {
+      "type": "string",
+      "enum": [
+       "learner",
+       "teacher",
+       "org_admin",
+       "admin"
+      ],
+      "title": "Role"
+     },
+     "audience": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Audience"
+     },
+     "organization_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Organization Id"
+     },
+     "share_with_org": {
+      "type": "boolean",
+      "title": "Share With Org"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "email",
+     "display_name",
+     "role",
+     "audience",
+     "organization_id",
+     "share_with_org",
+     "created_at"
+    ],
+    "title": "UserOut"
+   },
+   "UserPatch": {
+    "properties": {
+     "display_name": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 80,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Display Name"
+     },
+     "audience": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^[a-z0-9_]{1,48}$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Audience"
+     },
+     "share_with_org": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Share With Org"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "title": "UserPatch"
+   },
+   "ValidationError": {
+    "properties": {
+     "loc": {
+      "items": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "integer"
+        }
+       ]
+      },
+      "type": "array",
+      "title": "Location"
+     },
+     "msg": {
+      "type": "string",
+      "title": "Message"
+     },
+     "type": {
+      "type": "string",
+      "title": "Error Type"
+     },
+     "input": {
+      "title": "Input"
+     },
+     "ctx": {
+      "type": "object",
+      "title": "Context"
+     }
+    },
+    "type": "object",
+    "required": [
+     "loc",
+     "msg",
+     "type"
+    ],
+    "title": "ValidationError"
+   }
+  },
+  "securitySchemes": {
+   "HTTPBearer": {
+    "type": "http",
+    "description": "Токен из POST /api/v1/auth/login",
+    "scheme": "bearer"
+   }
+  }
+ }
+}

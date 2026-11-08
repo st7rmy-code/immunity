@@ -1,0 +1,79 @@
+name: CI
+on: [push, pull_request]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: {POSTGRES_USER: immunity, POSTGRES_PASSWORD: immunity_ci, POSTGRES_DB: immunity_test}
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U immunity" --health-interval 5s --health-timeout 3s --health-retries 20
+    defaults: {run: {working-directory: backend}}
+    env:
+      IMMUNITY_TEST_DATABASE_URL: postgresql+psycopg://immunity:immunity_ci@localhost:5432/immunity_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.13"}
+      - run: pip install -e ".[dev]"
+      - run: pytest
+      - name: OpenAPI в docs/ совпадает с кодом
+        run: python -m app.openapi_export > /tmp/openapi.json && diff -q /tmp/openapi.json ../docs/openapi.json
+
+  prototype:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: {browser: [chromium, webkit, msedge]}
+    defaults: {run: {working-directory: prototype}}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 22}
+      - run: npm install --no-audit --no-fund
+      - run: npx playwright install --with-deps ${{ matrix.browser == 'msedge' && 'msedge' || matrix.browser }}
+      - run: npm test
+        env: {PW_BROWSER: "${{ matrix.browser }}"}
+
+  frontend:
+    runs-on: ubuntu-latest
+    needs: backend
+    services:
+      postgres:
+        image: postgres:16
+        env: {POSTGRES_USER: immunity, POSTGRES_PASSWORD: immunity_ci, POSTGRES_DB: immunity}
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U immunity" --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      IMMUNITY_DATABASE_URL: postgresql+psycopg://immunity:immunity_ci@localhost:5432/immunity
+      IMMUNITY_JWT_SECRET: ci-only-secret-0123456789-abcdefghijklmnopqrstuvwxyz
+      IMMUNITY_COOKIE_SECURE: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.13"}
+      - uses: actions/setup-node@v4
+        with: {node-version: 22}
+      - name: Backend
+        working-directory: backend
+        run: |
+          pip install -e .
+          alembic upgrade head
+          python -m app.seed.load
+          nohup uvicorn app.main:app --port 8000 > /tmp/api.log 2>&1 &
+      - name: Frontend
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npx tsc -b --noEmit
+          npm test
+          npm run build
+          (cd ../prototype && node build.mjs)
+          npx playwright install --with-deps chromium
+          nohup npx vite preview --port 4173 --strictPort > /tmp/web.log 2>&1 &
+          npx wait-on -t 60000 http://127.0.0.1:4173/api/v1/health
+          npm run e2e
