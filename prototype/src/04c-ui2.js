@@ -188,12 +188,30 @@ function highlight(text,hits){const rs=[];hits.forEach(h=>h.ms.forEach(m=>rs.pus
   const box=el('div',{class:'hl'});let p=0;merged.forEach(([a,b])=>{if(a>p)box.append(text.slice(p,a));box.append(el('mark',{text:text.slice(a,b)}));p=b;});if(p<text.length)box.append(text.slice(p));return box;}
 function trainBtn(tr){if(!tr)return null;const x=scenarioById(tr[0],tr[1]);return x?el('button',{class:'btn sm',onclick:()=>tr[0]==='site'?openSite(tr[1]):openSim(tr[0],tr[1])},'Потренироваться: '+x.t):null;}
 let imgs=[];
-async function prepImage(file){const bmp=await createImageBitmap(file),s=Math.min(1,1400/Math.max(bmp.width,bmp.height)),c=document.createElement('canvas');c.width=Math.round(bmp.width*s);c.height=Math.round(bmp.height*s);c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);
-  const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',.85));return{blob,b64:c.toDataURL('image/jpeg',.85).split(',')[1],type:'image/jpeg',url:URL.createObjectURL(blob)};}
-async function addFiles(files){for(const f of files){if(!f.type.startsWith('image/'))continue;if(f.size>CK.IMG_MB*1048576){toast('Файл больше '+CK.IMG_MB+' МБ');continue;}if(imgs.length>=2){toast('Не больше двух скриншотов');break;}try{imgs.push(await prepImage(f));}catch(e){toast('Не удалось прочитать картинку');}}renderThumbs();}
+/* Изображения: только известные форматы, размеры читаются из заголовка ДО декодирования, лимит пикселей */
+const IMG_TYPES=['image/jpeg','image/png','image/webp','image/gif'],IMG_MAX_SIDE=8000,IMG_MAX_PX=40e6;
+async function imageSize(file){const b=new Uint8Array(await file.slice(0,262144).arrayBuffer()),u16=(i,le)=>le?b[i]|b[i+1]<<8:b[i]<<8|b[i+1],u32=i=>(b[i]<<24|b[i+1]<<16|b[i+2]<<8|b[i+3])>>>0;
+  if(b[0]===0x89&&b[1]===0x50&&b[2]===0x4E&&b[3]===0x47)return{type:'image/png',w:u32(16),h:u32(20)};
+  if(b[0]===0x47&&b[1]===0x49&&b[2]===0x46)return{type:'image/gif',w:u16(6,1),h:u16(8,1)};
+  if(b[0]===0x52&&b[1]===0x49&&b[2]===0x46&&b[3]===0x46&&b[8]===0x57&&b[9]===0x45&&b[10]===0x42&&b[11]===0x50){const f=String.fromCharCode(b[12],b[13],b[14],b[15]);
+    if(f==='VP8 ')return{type:'image/webp',w:u16(26,1)&0x3fff,h:u16(28,1)&0x3fff};
+    if(f==='VP8L'){const v=b[21]|b[22]<<8|b[23]<<16|b[24]<<24;return{type:'image/webp',w:(v&0x3fff)+1,h:((v>>14)&0x3fff)+1};}
+    if(f==='VP8X')return{type:'image/webp',w:1+(b[24]|b[25]<<8|b[26]<<16),h:1+(b[27]|b[28]<<8|b[29]<<16)};return null;}
+  if(b[0]===0xFF&&b[1]===0xD8){let i=2;while(i+9<b.length){if(b[i]!==0xFF){i++;continue;}const m=b[i+1];if(m>=0xC0&&m<=0xCF&&![0xC4,0xC8,0xCC].includes(m))return{type:'image/jpeg',h:u16(i+5),w:u16(i+7)};if(m===0xD8||m===0x01||(m>=0xD0&&m<=0xD7)){i+=2;continue;}i+=2+u16(i+2);}return null;}
+  return null;}
+async function prepImage(file){const sz=await imageSize(file);
+  if(!sz||!IMG_TYPES.includes(sz.type))throw{msg:'Поддерживаются только JPEG, PNG, WebP и GIF'};
+  if(!sz.w||!sz.h||sz.w>IMG_MAX_SIDE||sz.h>IMG_MAX_SIDE||sz.w*sz.h>IMG_MAX_PX)throw{msg:'Слишком большое изображение (до '+IMG_MAX_SIDE+' пикселей по стороне)'};
+  const s=Math.min(1,1400/Math.max(sz.w,sz.h)),tw=Math.max(1,Math.round(sz.w*s)),th=Math.max(1,Math.round(sz.h*s));
+  let bmp;try{bmp=await createImageBitmap(file,{resizeWidth:tw,resizeHeight:th,resizeQuality:'high'});}catch(e){bmp=await createImageBitmap(file);}
+  const c=document.createElement('canvas');c.width=tw;c.height=th;c.getContext('2d').drawImage(bmp,0,0,tw,th);bmp.close&&bmp.close();
+  const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',.85));const b64=c.toDataURL('image/jpeg',.85).split(',')[1];c.width=c.height=0;
+  return{blob,b64,type:'image/jpeg',url:URL.createObjectURL(blob)};}
+async function addFiles(files){for(const f of files){if(!IMG_TYPES.includes(f.type)){toast('Поддерживаются только JPEG, PNG, WebP и GIF');continue;}if(f.size>CK.IMG_MB*1048576){toast('Файл больше '+CK.IMG_MB+' МБ');continue;}if(imgs.length>=2){toast('Не больше двух скриншотов');break;}try{imgs.push(await prepImage(f));}catch(e){toast(e&&e.msg||'Не удалось прочитать картинку');}}renderThumbs();}
+function clearImages(){imgs.forEach(im=>{try{URL.revokeObjectURL(im.url);}catch(e){}});imgs=[];renderThumbs();}
 function renderThumbs(){const t=$('#ckThumbs');t.innerHTML='';imgs.forEach((im,i)=>t.append(el('div',{},el('img',{src:im.url,alt:'Скриншот '+(i+1)}),el('button',{'aria-label':'Убрать скриншот',onclick:()=>{URL.revokeObjectURL(im.url);imgs.splice(i,1);renderThumbs();}},'✕'))));}
 $('#ckAddImg').onclick=()=>$('#ckFile').click();$('#ckFile').onchange=e=>{addFiles([...e.target.files]);e.target.value='';};
-$('#ckText').addEventListener('paste',e=>{const fs=[...(e.clipboardData&&e.clipboardData.files||[])].filter(f=>f.type.startsWith('image/'));if(fs.length){e.preventDefault();addFiles(fs);}});
+$('#ckText').addEventListener('paste',e=>{const fs=[...(e.clipboardData&&e.clipboardData.files||[])].filter(f=>IMG_TYPES.includes(f.type));if(fs.length){e.preventDefault();addFiles(fs);}});
 $('#toEmergency').onclick=()=>{showTab('protect');setTimeout(()=>$('#emergency').scrollIntoView({behavior:'smooth'}),60);};
 /* вопрос наставнику */
 const ASK_SUG=['Что мне потренировать?','Что такое дроппер и чем это грозит?','Как защитить пожилых родителей?','Как понять, что голос подделан?'];
@@ -207,9 +225,10 @@ function renderAsk(){const log=$('#askLog');log.innerHTML='';
   if(MENTOR.busy)log.append(el('div',{class:'mmsg bot typing',text:'Наставник думает…'}));
   log.scrollTop=log.scrollHeight;$('#askGo').disabled=MENTOR.busy;}
 async function askSend(q){q=String(q||'').trim();if(!q||MENTOR.busy)return;$('#askIn').value='';
-  let text=q;if(AI.ready&&!AI.limited()){const c=await Privacy.confirm({text:q,purpose:'ответ наставника'});if(!c.ok)return;text=c.text||q;}
+  const hist=MENTOR.chat.slice(-6).map(m=>(m.role==='user'?'Пользователь: '+m.text:'Наставник: '+(m.data&&m.data.answer||''))).join('\n');
+  let text=Privacy.mask(q).text;
+  if(AI.ready&&!AI.limited()){const c=await Privacy.confirm({purpose:'вопрос наставнику',key:'ask',parts:[{label:'Ваш вопрос',text:q,user:true,edit:true},{label:'Ваш профиль навыков (оценки по темам, без личных данных)',text:Mentor.profileText()},{label:'Предыдущие сообщения этого разговора',text:hist,user:true}],note:'Также модель получает каталог упражнений и словарь тренажёра — это не ваши данные.'});if(!c.ok)return;text=c.text||text;}
   MENTOR.chat.push({role:'user',text});MENTOR.busy=true;renderAsk();
-  const hist=MENTOR.chat.slice(-7,-1).map(m=>(m.role==='user'?'Пользователь: '+m.text:'Наставник: '+(m.data&&m.data.answer||''))).join('\n');
   const r=await Mentor.ask(text,hist);MENTOR.busy=false;MENTOR.chat.push({role:'bot',data:r.data,local:!!r.local});MENTOR.chat=MENTOR.chat.slice(-20);renderAsk();
   if(r.err&&r.local)toast(AI.msg(r.err)+' Ответил без ИИ.');}
 $('#askForm').addEventListener('submit',e=>{e.preventDefault();askSend($('#askIn').value);});
@@ -224,7 +243,7 @@ function renderMistakes(){const box=$('#m-mist');box.innerHTML='';const rep=Evid
   if(list.length)box.append(el('div',{class:'card'},el('h2',{text:'Последние ошибки'}),el('div',{class:'stack',style:'gap:8px'},list.map(a=>{const x=scenarioById(a.k,a.id),t=x?(x.t||x.text||x.x):a.id;
     return el('div',{class:'trow'},el('div',{style:'min-width:0'},el('b',{class:'small',text:KIND_T[a.k]+' · '+String(t).slice(0,80)}),el('span',{class:'small muted',text:(a.fp?'лишняя тревога на честном сообщении':RES_T[a.res])+(a.mk&&a.mk.length?' · '+a.mk.map(m=>MARKERS[m]).join(', '):'')})),(a.k==='call'||a.k==='chat'||a.k==='site')?el('button',{class:'btn sm ghost',onclick:()=>startEx({k:a.k,id:a.id})},'Повторить'):null);}))));
   const out=el('div',{class:'stack'});
-  box.append(el('div',{class:'card flat'},el('div',{class:'ph'},el('h2',{text:'Разбор с наставником'}),el('button',{class:'btn sm primary',disabled:!AI.ready||AI.limited()||!list.length,onclick:async e=>{const b=e.currentTarget;b.disabled=true;out.innerHTML='';out.append(el('p',{class:'small muted',text:'Наставник ищет закономерности… обычно до минуты'}));
+  box.append(el('div',{class:'card flat'},el('div',{class:'ph'},el('h2',{text:'Разбор с наставником'}),el('button',{class:'btn sm primary',disabled:!AI.ready||AI.limited()||!list.length,onclick:async e=>{const b=e.currentTarget;const c=await Privacy.confirm({purpose:'разбор ошибок',key:'mistakes',parts:[{label:'Список ваших ошибок в тренировках',text:Mentor.mistakeList()},{label:'Ваш профиль навыков',text:Mentor.profileText()}]});if(!c.ok)return;b.disabled=true;out.innerHTML='';out.append(el('p',{class:'small muted',text:'Наставник ищет закономерности… обычно до минуты'}));
       const r=await Mentor.explainMistakes();b.disabled=false;out.innerHTML='';
       if(!r.ok){out.append(el('p',{class:'small muted',text:AI.msg(r.err)}));return;}
       const d=r.data;out.append(d.summary?el('p',{text:d.summary}):null,el('div',{class:'stack',style:'gap:8px'},d.patterns.map(p=>el('div',{class:'flag'},el('b',{text:p.title}),el('span',{class:'small',text:p.why}),el('span',{class:'small'},el('b',{text:'Совет: '}),p.tip)))),d.recs.length?recButtons(d.recs):null,el('p',{class:'tiny faint',text:'Мнение ИИ на основе ваших ошибок в тренажёре. Может ошибаться.'}));}},'Найти закономерности')),

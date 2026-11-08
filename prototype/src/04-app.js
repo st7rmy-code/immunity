@@ -117,7 +117,9 @@ const ME_T={code:c=>'Код: '+c,card:()=>'2202 20•• •••• 5512, ср
 const LAST_T={code:'Спасибо, всё, операция отменена. Ожидайте.',card:'Отлично, проверяю… Всё прошло.',transfer:'Спасибо, ваши деньги в безопасности. Ожидайте подтверждения.',cash:'Курьер уже выехал. Никому не звоните.',data:'Отлично. Ждите дальнейших указаний.',phish:'Данные получены, спасибо!'};
 const DANGER_MK={code:'code',card:'data',transfer:'safe',cash:'kin',data:'data',phish:'link'};
 
-function stopSim(){if(!SIM)return;clearInterval(SIM.timer);clearTimeout(SIM.smsT);SIM.dead=true;ring(false);hush();STT.stop(true);VC.listening=false;}
+/* таймер, привязанный к конкретной тренировке: после переключения сценария он не сработает */
+function later(fn,ms){const me=SIM;if(!me)return 0;if(!me.timers)me.timers=new Set();const id=setTimeout(()=>{me.timers.delete(id);if(SIM!==me||me.dead)return;fn();},ms);me.timers.add(id);return id;}
+function stopSim(){if(!SIM)return;clearInterval(SIM.timer);clearTimeout(SIM.smsT);if(SIM.timers){SIM.timers.forEach(clearTimeout);SIM.timers.clear();}SIM.dead=true;ring(false);hush();STT.stop(true);VC.listening=false;}
 function openSim(mode,id){
   const sc=(mode==='call'?CALLS:CHATS).find(x=>x.id===id);if(!sc)return;
   showTab('train');stopSim();
@@ -152,9 +154,9 @@ function accept(){ring(false);buzz(0);SIM.state='talk';SIM.t0=Date.now();renderP
   SIM.timer=setInterval(()=>{if(!SIM||SIM.ended)return;const t=$('#ctimer');if(t)t.textContent=mmss((Date.now()-SIM.t0)/1000);if(SIM.sc.timer&&SIM.tLeft>0){SIM.tLeft--;updTimer();}},1000);
   playOpen();}
 function playOpen(){const sc=SIM.sc,open=SIM.mode==='call'?[{say:sc.open}]:sc.open;SIM.busy=true;renderCtl();
-  let i=0;const next=()=>{if(!SIM||SIM.dead||SIM.ended)return;if(i>=open.length){SIM.busy=false;renderCtl();if(sc.sms&&!SIM.sms&&open.some(m=>/код/i.test(m.say)))SIM.smsT=setTimeout(showSMS,1400);return;}
-    const m=open[i++];themSay(m.say,m.who);setTimeout(next,SIM.mode==='call'?300:900);};
-  setTimeout(next,SIM.mode==='call'?500:400);}
+  let i=0;const next=()=>{if(!SIM||SIM.dead||SIM.ended)return;if(i>=open.length){SIM.busy=false;renderCtl();if(sc.sms&&!SIM.sms&&open.some(m=>/код/i.test(m.say)))SIM.smsT=later(showSMS,1400);return;}
+    const m=open[i++];themSay(m.say,m.who);later(next,SIM.mode==='call'?300:900);};
+  later(next,SIM.mode==='call'?500:400);}
 const VOICE_RE=/^🎤\s*(?:Голосовое\s*)?(\d+:\d+)?\s*[—-]?\s*«?([\s\S]*?)»?\s*$/;
 function drawLine(l){const tr=$('#tr');if(!tr)return;
   if(l.sys){tr.append(el('div',{class:'bub sys',text:l.text}));tr.scrollTop=tr.scrollHeight;return;}
@@ -185,7 +187,7 @@ function renderCtl(){const box=$('#phCtl');if(!box||!SIM)return;box.innerHTML=''
     qrs.append(el('button',{class:'qr',disabled:SIM.busy,onclick:()=>{SIM.ev.block=true;SIM.decAt=Date.now();sysSay('Вы заблокировали собеседника и пожаловались');end();}},'⛔ Заблокировать'));
     if(sc.verify)qrs.append(el('button',{class:'qr',disabled:SIM.busy,onclick:verifyFlow},'📞 Проверить звонком'));}
   sc.quick.filter(q=>q.d||!SIM.used.has(q.t)).forEach(q=>qrs.append(el('button',{class:'qr'+(q.d&&S.coach?' danger':''),disabled:SIM.busy,onclick:()=>quick(q)},q.t)));
-  const form=el('form',{class:'ph-form',onsubmit:e=>{e.preventDefault();const i=$('#phIn');const v=i.value;i.value='';userSend(v);}},
+  const form=el('form',{class:'ph-form',onsubmit:e=>{e.preventDefault();const i=$('#phIn');const v=i.value;if(!v.trim())return;if(!SIM||SIM.ended||SIM.busy){if(SIM&&SIM.busy&&!SIM.ended)toast('Собеседник ещё говорит — ответ сохранён в поле, отправьте через секунду');return;}i.value='';userSend(v);}},
     el('input',{id:'phIn',placeholder:VC.listening?'Говорите — я слушаю…':SIM.mode==='call'?'Ответьте своими словами…':'Сообщение…',autocomplete:'off','aria-label':'Ваш ответ',maxlength:'300'}),
     SIM.mode==='call'&&STT.ok()?el('button',{type:'button',id:'micBtn',class:'mic'+(VC.listening?' on':''),'aria-pressed':String(VC.listening),'aria-label':VC.listening?'Закончить ответ':'Ответить голосом',disabled:SIM.busy&&!VC.listening,html:IC.mic,onclick:()=>VC.listening?STT.stop(false):micStart(false)}):null,
     el('button',{type:'submit','aria-label':'Отправить',disabled:SIM.busy},'↑'));
@@ -204,14 +206,14 @@ function userSend(text){text=String(text||'').trim();if(!text||!SIM||SIM.ended||
   const t=maskPII(text);meSay(t);let k='other';
   if(/(перезвон|положу|кладу|не буду|не стану|мошенни|развод|аферист|проверю|сам\S* позвон|по номеру (на|с) карт|не скажу|не назову|никаких код|до свидания|полици|102|не верю|не интересно|не надо|заблокир|пожалуюсь|посоветуюсь|нет,? спасибо|отказываюсь)/i.test(t))k='resist';
   else if(/(кто вы|как вас зовут|фио|должност|какой отдел|удостоверени|откуда (вы|у вас)|как(ая|ой) (компания|банк|отдел|организация)|номер договора|официальн|докажите|кодов\S* слов|назови|как зовут)/i.test(t))k='askid';
-  else if(/(хорошо|ладно|давайте|конечно|готов|согласн|что (нужно|надо)|как (отменить|быть|получить|начать)|диктую|сейчас (переведу|сниму|скажу|продиктую|отправлю)|переведу|сниму|установлю|скачаю|отправлю|записывайте|да\b)/i.test(t))k='comply';
+  else if(/(хорошо|ладно|давайте|конечно|готов|согласн|что (нужно|надо)|как (отменить|быть|получить|начать)|диктую|сейчас (переведу|сниму|скажу|продиктую|отправлю)|переведу|сниму|установлю|скачаю|отправлю|записывайте|да(?![а-яё]))/i.test(t))k='comply';
   if(k!=='other')SIM.ev[k]++;SIM.last=k;nextTurn();}
 function danger(kind){const sc=SIM.sc;SIM.ev[kind]=true;SIM.decAt=Date.now();
   if(kind!=='phish')meSay(ME_T[kind](SIM.code));SIM.busy=true;renderCtl();
-  setTimeout(()=>{if(!SIM||SIM.dead)return;
-    if(sc.honest){themSay(SIM.mode==='call'?'Стоп! Никогда не называйте коды и данные карты — даже сотрудникам банка. Я у вас ничего не спрашиваю.':'Ой, не надо! Никому не сообщайте такие данные, мне они не нужны.');SIM.busy=false;setTimeout(end,1400);return;}
+  later(()=>{
+    if(sc.honest){themSay(SIM.mode==='call'?'Стоп! Никогда не называйте коды и данные карты — даже сотрудникам банка. Я у вас ничего не спрашиваю.':'Ой, не надо! Никому не сообщайте такие данные, мне они не нужны.');SIM.busy=false;later(end,1400);return;}
     themSay(LAST_T[kind]);
-    setTimeout(()=>{if(!SIM||SIM.dead)return;notify(CONSEQ[kind].replace('{sum}',sc.sum||'48 700'),true);buzz([200,80,200]);setTimeout(end,1700);},900);},700);}
+    later(()=>{notify(CONSEQ[kind].replace('{sum}',sc.sum||'48 700'),true);buzz([200,80,200]);later(end,1700);},900);},700);}
 function notify(text,bad){const box=$('#smsbox');if(!box)return;box.innerHTML='';box.append(el('div',{class:'sms'+(bad?' bad':''),role:'alert'},el('b',{text:bad?'Уведомление · сейчас':'Сообщение'}),el('span',{text})));}
 function showSMS(){if(!SIM||SIM.dead||SIM.sms||!SIM.sc.sms||SIM.ended)return;SIM.sms=true;
   const t=SIM.sc.sms.text.replace('{code}',SIM.code),box=$('#smsbox');if(!box)return;box.innerHTML='';
@@ -222,14 +224,17 @@ function showSMS(){if(!SIM||SIM.dead||SIM.sms||!SIM.sc.sms||SIM.ended)return;SIM
 async function nextTurn(){const sc=SIM.sc;SIM.uTurns++;SIM.busy=true;renderCtl();
   const tr=$('#tr'),typing=el('div',{class:'bub them typing',text:SIM.mode==='call'?'говорит…':'печатает…'});if(tr){tr.append(typing);tr.scrollTop=tr.scrollHeight;}
   let out=null;const sim=SIM;
-  if(AI.ready&&!AI.limited()&&!useRecorded(sim)){try{out=await Mentor.scamTurn(sim);}catch(e){out=null;}renderAIStatus();}
+  if(AI.ready&&!AI.limited()&&!useRecorded(sim)&&!sim.aiOff){
+    if(!sim.aiOk){const c=await Privacy.confirm({purpose:'тренировка с ИИ-собеседником',key:'sim',parts:[{label:'Что уходит модели на каждом ходу',text:'Описание роли собеседника из тренажёра и весь текущий разговор, включая ваши реплики. Номера, карты, коды и другие личные данные в ваших репликах скрываются автоматически.'},{label:'Разговор сейчас',text:Mentor.transcript(sim),user:true}]});
+      if(sim!==SIM||sim.dead){typing.remove();return;}if(c.ok)sim.aiOk=true;else{sim.aiOff=true;sysSay('Собеседник продолжит по сценарию, без ИИ');}}
+    if(sim.aiOk){try{out=await Mentor.scamTurn(sim);}catch(e){out=null;}renderAIStatus();}}
   if(!out){await new Promise(r=>setTimeout(r,650+Math.random()*500));out=scriptTurn();}
   typing.remove();if(sim!==SIM||SIM.dead||SIM.ended)return;SIM.busy=false;
   for(const m of out.msgs)themSay(m.say,m.who);
   if(out.pressure!=null&&!sc.honest){SIM.press=out.pressure;renderSide();}
   if(sc.sms&&!SIM.sms&&(out.sms||out.msgs.some(m=>/код/i.test(m.say)&&!/не (называйте|сообщайте)/i.test(m.say))))showSMS();
   if(out.end||SIM.uTurns>=MAX_TURNS){if(!out.end)themSay(sc.honest?'Всего доброго!':(sc.giveup||GEN[SIM.mode].giveup));
-    SIM.ev.themEnd=true;sysSay(SIM.mode==='call'?'Собеседник завершил звонок':'Собеседник перестал отвечать');setTimeout(end,1200);}
+    SIM.ev.themEnd=true;sysSay(SIM.mode==='call'?'Собеседник завершил звонок':'Собеседник перестал отвечать');later(end,1200);}
   renderCtl();}
 /* без ИИ: реплика выбирается по смыслу ответа — сопротивление, вопрос о личности, согласие */
 function scriptTurn(){const sc=SIM.sc,L=sc.script,g=GEN[SIM.mode];
@@ -260,14 +265,14 @@ function verifyFlow(){if(!SIM||SIM.ended)return;hush();ring(false);const sc=SIM.
   const opts=shuffle([{t:v.c,good:1},{t:trapA},{t:'Номер, который назовёт или пришлёт собеседник'}]);
   const scr=$('#phone .ph-screen'),ov=el('div',{class:'vfy',role:'dialog','aria-label':'Проверка через другой канал'});
   const pick=o=>{ov.innerHTML='';ov.append(el('div',{class:'small',style:'color:var(--phone-muted)',text:'Связываемся: '+o.t}),el('div',{class:'typing',text:'…'}));
-    setTimeout(()=>{if(!SIM||SIM.ended)return;ov.innerHTML='';
+    later(()=>{if(SIM.ended)return;ov.innerHTML='';
       if(o.good){SIM.ev.callback=true;ov.append(el('b',{text:'Ответ по проверенному каналу'}),el('div',{class:'bub them',text:v.a}));sysSay('Проверка: '+v.c);}
       else{SIM.ev.badVerify=true;ov.append(el('b',{text:'Ответил тот же собеседник'}),el('div',{class:'bub them',text:sc.honest?'«Да, это мы». Сходится, но надёжнее связываться по номеру, который вы знаете сами: номер звонящего и ссылку из чата можно подделать.':SIM.mode==='call'?'«Да-да, это мы. Давайте продолжим, время идёт».':'«Да, это я, конечно! Давай быстрее».'}));sysSay('Проверка не через тот канал: '+o.t);}
       ov.append(el('button',{class:'btn sm',onclick:()=>{ov.remove();end();}},'Завершить и посмотреть разбор'));},900);};
   ov.append(el('b',{text:'Как проверите?'}),el('p',{class:'small',text:'Выберите канал, которому можно доверять.'}),...opts.map(o=>el('button',{class:'vopt',onclick:()=>pick(o)},o.t)),el('button',{class:'btn sm',onclick:()=>{ov.remove();SIM.decAt=null;}},'Вернуться'));
   scr.append(ov);}
 function end(){
-  if(!SIM||SIM.ended)return;SIM.ended=true;SIM.endAt=Date.now();clearInterval(SIM.timer);ring(false);STT.stop(true);VC.listening=false;setTimeout(hush,SIM.ev.hangup||SIM.ev.callback?0:2500);
+  if(!SIM||SIM.ended)return;SIM.ended=true;SIM.endAt=Date.now();clearInterval(SIM.timer);ring(false);STT.stop(true);VC.listening=false;later(hush,SIM.ev.hangup||SIM.ev.callback?0:2500);
   if(SIM.state==='ring'){SIM.state='talk';SIM.lines.push({sys:true,text:'Вы отклонили вызов'});renderPhone();}
   const sc=SIM.sc,e=SIM.ev,v=verdictOf();SIM.v=v;
   const fp=!!(sc.honest&&(e.declined||e.block)),bad=['code','card','transfer','cash','data','phish'].find(k=>e[k]);
@@ -320,7 +325,7 @@ function renderSide(){const side=$('#simSide');if(!side||!SIM||SIM.mode==='site'
   if(v.k==='bad'&&!sc.honest)row.append(el('button',{class:'btn ghost',onclick:()=>{showTab('protect');setTimeout(()=>$('#emergency').scrollIntoView({behavior:'smooth'}),60);}},'Если это случилось в жизни'));
   side.append(row);if(nx)side.append(el('p',{class:'tiny faint',text:'Почему дальше это: '+nx.why.join('; ').toLowerCase()}));
   side.append(el('div',{id:'aiDebBox',class:'stack'}));}
-async function aiDebrief(){const b=$('#aiDeb');if(b)b.disabled=true;const box=$('#aiDebBox');box.innerHTML='';box.append(el('p',{class:'small muted',text:'Наставник разбирает разговор… обычно до минуты'}));
+async function aiDebrief(){const me=SIM;const c=await Privacy.confirm({purpose:'разбор тренировки',key:'debrief',parts:[{label:'Расшифровка тренировочного разговора',text:Mentor.transcript(me),user:true}]});if(!c.ok||SIM!==me)return;const b=$('#aiDeb');if(b)b.disabled=true;const box=$('#aiDebBox');box.innerHTML='';box.append(el('p',{class:'small muted',text:'Наставник разбирает разговор… обычно до минуты'}));
   const r=await Mentor.debrief(SIM);box.innerHTML='';if(b)b.disabled=false;
   if(!r.ok){box.append(el('p',{class:'small muted',text:AI.msg(r.err)}));return;}
   const j=r.data,sc2=Math.max(0,Math.min(100,+j.score||0)),L=(h,a)=>Array.isArray(a)&&a.length?el('div',{class:'stack',style:'gap:4px'},el('b',{class:'small',text:h}),el('ul',{class:'clean small'},a.slice(0,3).map(x=>el('li',{text:String(x)})))):null;
@@ -394,4 +399,4 @@ function renderProt(){const box=$('#protList');box.innerHTML='';
       el('div',{class:'stack',style:'justify-items:center;gap:4px'},el('button',{class:'sw',role:'switch','aria-checked':String(on),'aria-label':'Сделано: '+p.t,onclick:()=>{S.prot[p.id]=!on;save();renderProt();}}),el('span',{class:'tiny muted',text:on?'сделано':'не сделано'}))));});
   $('#protScore').textContent='Сделано: '+PROT.filter(p=>S.prot[p.id]).length+' из '+PROT.length;}
 function renderLaws(){const box=$('#lawList');box.innerHTML='';LAWS.forEach(l=>box.append(el('div',{class:'stack',style:'gap:6px;border-top:3px solid var(--accent);padding-top:10px'},el('h3',{text:l.t}),el('p',{class:'small',text:l.d}),srcLink(l.s))));}
-function renderEmerg(){const ol=$('#emSteps');ol.innerHTML='';EMERG.forEach(([t,d])=>ol.append(el('li',{},el('div',{},el('b',{text:t}),el('span',{class:'small muted',text:d})))));$('#emNote').innerHTML='';$('#emNote').append('Не стыдитесь: мошенники работают командами по отработанным сценариям, попасться может каждый. ',srcLink('bankiros'));}
+function renderEmerg(){const ol=$('#emSteps');ol.innerHTML='';EMERG.forEach(([t,d])=>ol.append(el('li',{},el('div',{},el('b',{text:t}),el('span',{class:'small muted',text:d})))));$('#emNote').innerHTML='';$('#emNote').append('Не стыдитесь: мошенники работают командами по отработанным сценариям, попасться может каждый. Это памятка, а не юридическая консультация: правила меняются, уточняйте в банке и на сайте Банка России. ',srcLink(['refund30','bankiros']));}

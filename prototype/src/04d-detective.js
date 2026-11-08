@@ -1,7 +1,7 @@
 /* ===== AI-детектив: сообщения, ссылки и письма в одной схеме ответа =====
    Схема (и у правил, и у ИИ): {risk_level, confidence 0..1|null, detected_indicators[], explanation,
    limitations[], recommended_actions[], avoid_actions[], sources[]} */
-const RISK={unknown:{k:'',t:'Недостаточно данных',n:0},low:{k:'ok',t:'Низкий риск',n:1},medium:{k:'warn',t:'Средний риск',n:2},high:{k:'bad',t:'Высокий риск',n:3},critical:{k:'bad',t:'Критический риск',n:4}};
+const RISK=dict({unknown:{k:'',t:'Недостаточно данных',n:0},low:{k:'ok',t:'Низкий риск',n:1},medium:{k:'warn',t:'Средний риск',n:2},high:{k:'bad',t:'Высокий риск',n:3},critical:{k:'bad',t:'Критический риск',n:4}});
 const CK={kind:'msg',MAX:10000,IMG_MB:10};
 const CK_HELP={
   msg:'Вставьте текст СМС, переписки или перескажите звонок. Можно добавить скриншот. Сначала текст проверят правила прямо в браузере; ИИ получит его только после вашего согласия, с замаскированными личными данными.',
@@ -20,67 +20,103 @@ function ckValidate(m){const e=[];
   if(imgs.length>2)e.push('Не больше двух скриншотов');
   return e;}
 
-/* --- правила для ссылок --- */
+/* --- уровни признаков: критические решают сами, остальные складываются по правилам приоритета --- */
+const TIER=dict({critical:{t:'критический',n:4,k:'bad'},strong:{t:'сильный',n:3,k:'bad'},medium:{t:'средний',n:2,k:'warn'},weak:{t:'слабый',n:1,k:''}});
+const FLAG_TIER=dict({codes:'critical',safe:'critical',app:'critical',cash:'critical',drops:'strong',invest:'strong',kin:'strong',wrong:'strong',inject:'strong',auth:'medium',secret:'medium',prize:'medium',prepay:'medium',rush:'weak',link:'weak'});
+const INJECT_RE=/((игнорируй|забудь|не учитывай|ignore|disregard)\s+(все\s+|all\s+)?(предыдущ|прежн|previous|prior|above)\S*\s*(инструкц|указан|правил|instructions|rules)\S*|system\s*prompt|системн\S*\s+(промпт|инструкц)\S*|ты\s+теперь\s+\S+|(ответь|скажи|оцени|верни)\S*,?\s+что\s+(это\s+)?(безопасн|не мошенн)\S*|risk_level)/gi;
+/* предупреждение вида «никому не сообщайте код» — это не просьба, а совет */
+const NEG_BEFORE=/(^|[^а-яё])(не|никому|никогда|нельзя|ни в коем случае)([^а-яё.!?]+[а-яё]+){0,3}[^а-яё.!?]*$/i;
+function negated(text,idx){return NEG_BEFORE.test(text.slice(Math.max(0,idx-40),idx));}
+
+/* --- разбор адреса: WHATWG URL + декодирование IDN (punycode, RFC 3492) --- */
+function punyDecode(s){const base=36,tmin=1,tmax=26,skew=38,damp=700;let n=128,i=0,bias=72;const out=[];let b=s.lastIndexOf('-');if(b<0)b=0;
+  for(let j=0;j<b;j++){if(s.charCodeAt(j)>=128)return null;out.push(s.charCodeAt(j));}
+  for(let idx=b>0?b+1:0;idx<s.length;){const oldi=i;let w=1;for(let k=base;;k+=base){if(idx>=s.length)return null;const c=s.charCodeAt(idx++);const d=c-48<10?c-22:c-65<26?c-65:c-97<26?c-97:base;if(d>=base)return null;i+=d*w;const t=k<=bias?tmin:k>=bias+tmax?tmax:k-bias;if(d<t)break;w*=base-t;if(w>1e9)return null;}
+    const len=out.length+1;let delta=i-oldi;delta=Math.floor(oldi===0?delta/damp:delta/2);delta+=Math.floor(delta/len);let k=0;while(delta>((base-tmin)*tmax)>>1){delta=Math.floor(delta/(base-tmin));k+=base;}bias=k+Math.floor((base-tmin+1)*delta/(delta+skew));
+    n+=Math.floor(i/len);i%=len;if(n>0x10ffff)return null;out.splice(i++,0,n);}
+  return String.fromCodePoint(...out);}
+function hostUnicode(host){return host.split('.').map(l=>/^xn--/i.test(l)?(punyDecode(l.slice(4))||l):l).join('.');}
+const scriptsOf=t=>({lat:/[a-z]/i.test(t),cyr:/[а-яё]/i.test(t),grk:/[α-ω]/i.test(t)});
+const CYR_LOOKALIKE=/^[аеорсухкмтвнi\d-]+$/i;
+function parseUrl(raw){let s=String(raw||'').trim();if(!s)return null;
+  const scheme=(s.match(/^([a-z][a-z0-9+.-]*):/i)||[])[1];
+  if(scheme&&!/^https?$/i.test(scheme)&&!/^\/\//.test(s.slice(scheme.length+1)))return{scheme:scheme.toLowerCase(),raw:s,opaque:true};
+  if(!scheme)s='http://'+s.replace(/^\/\//,'');
+  let u;try{u=new URL(s);}catch(e){return{bad:true,raw:s};}
+  const host=u.hostname.toLowerCase();return{u,scheme:u.protocol.slice(0,-1),host,uhost:hostUnicode(host),explicit:!!scheme,raw:s};}
 const SHORTENERS=/^(bit\.ly|tinyurl\.com|clck\.ru|cutt\.ly|goo\.su|t\.co|is\.gd|vk\.cc|u\.to|qps\.ru|rebrand\.ly|shorturl\.at|tiny\.cc|ow\.ly)$/i;
 const RISKY_TLD=/\.(top|click|site|online|xyz|icu|live|buzz|cfd|sbs|rest|fun|monster|win|vip|tk|ml|ga|cf|gq|shop|link)$/i;
 const LURE_RE=/(gos|uslug|bank|pay|oplat|shtraf|fine|vhod|login|signin|verify|secure|bezopas|bonus|vyplat|kompens|podar|prize|robux|nalog|pensi|socfond|lk-|kabinet|cabinet|refund|vozvrat|dostavk|delivery|parkov|kvitanc|akci)/gi;
-function hostOf(raw){let s=String(raw||'').trim().replace(/^[a-z][a-z0-9+.-]*:\/\//i,'');const auth=s.split(/[\/?#]/)[0];const at=auth.lastIndexOf('@');const hp=at>=0?auth.slice(at+1):auth;const host=hp.replace(/:\d+$/,'').toLowerCase();return{host,hasAt:at>=0,port:(hp.match(/:(\d+)$/)||[])[1]||'',path:s.slice(auth.length)};}
-function urlRules(raw){const hits=[];const s=String(raw||'').trim();if(!s)return hits;const add=(id,t,why,w,q)=>hits.push({id,title:t,explanation:why,w,quote:q||''});
-  const {host,hasAt,port,path}=hostOf(s);
-  if(!host||!/[.]/.test(host)){add('url_bad','Это не похоже на обычный адрес сайта','Проверьте, что ссылка скопирована целиком.',10,s.slice(0,60));return hits;}
-  if(/^http:\/\//i.test(s))add('url_http','Нет защищённого соединения','Адрес начинается с http://. Настоящие банки и госсервисы так не работают. Но и https не доказывает, что сайт честный.',10,'http://');
-  if(hasAt)add('url_at','Адрес замаскирован символом @','Всё, что стоит до @, браузер игнорирует: настоящий сайт — то, что после него.',35,'@');
-  if(/^\d{1,3}(\.\d{1,3}){3}$/.test(host))add('url_ip','Вместо имени сайта — набор цифр','Организации не присылают ссылки на IP-адреса.',30,host);
-  const cyr=/[а-яё]/i.test(host),lat=/[a-z]/i.test(host.replace(/\.(рф|рус)$/,''));
-  if(cyr&&lat)add('url_mix','Русские и латинские буквы вперемешку','Так подделывают известные адреса: «а» и «a» выглядят одинаково.',40,host);
-  if(/(^|\.)xn--/.test(host))add('url_puny','Адрес закодирован (xn--)','Под таким кодом могут прятаться буквы, похожие на латинские.',20,host);
-  if(SHORTENERS.test(host))add('url_short','Короткая ссылка скрывает настоящий адрес','Куда она ведёт, не видно, пока не откроете. Не открывайте ссылки из неожиданных сообщений.',15,host);
-  if(RISKY_TLD.test(host))add('url_tld','Доменная зона одноразовых сайтов','Такие зоны дёшевы и часто используются для фишинга. Само по себе это не доказательство.',20,'.'+host.split('.').pop());
-  const lure=[...new Set((host.match(LURE_RE)||[]).map(x=>x.toLowerCase()))];
-  if(lure.length)add('url_lure','Слова-приманки в адресе','«'+lure.slice(0,3).join('», «')+'» — так делают адрес похожим на сервис оплаты, госуслуг или банка.',20,lure[0]);
-  const labels=host.split('.');if(labels.length>=4||(host.match(/-/g)||[]).length>=2)add('url_long','Длинный составной адрес','Много дефисов и поддоменов — частый признак поддельного сайта.',15,host);
-  if(port&&!['80','443'].includes(port))add('url_port','Нестандартный порт','Обычные сайты не указывают порт в адресе.',15,':'+port);
-  if(/\.(apk|exe|scr|msi|bat|js|zip|rar|7z)(\?|#|$)/i.test(path))add('url_file','Ссылка скачивает файл','Так распространяют вредоносные программы, в том числе для удалённого доступа к телефону.',40,(path.match(/[^\/?#]+\.(apk|exe|scr|msi|bat|js|zip|rar|7z)/i)||[''])[0]);
+const REDIR_KEYS=/^(url|redirect|redirect_uri|redirect_url|next|to|goto|return|returnurl|r|u|target|dest|destination|link|out)$/i;
+function urlRules(raw){const hits=[];const P=parseUrl(raw);if(!P)return hits;const add=(id,tier,t,why,q)=>hits.push({id,tier,title:t,explanation:why,quote:q||''});
+  if(P.opaque){const dang=/^(javascript|data|vbscript|file|blob|intent|content)$/.test(P.scheme);add('url_scheme',dang?'critical':'medium',dang?'Опасный тип ссылки':'Необычный тип ссылки',dang?'Такие ссылки выполняют код или открывают файлы на устройстве. Не открывайте.':'Это не обычная веб-ссылка. Убедитесь, что понимаете, что она откроет.',P.scheme+':');return hits;}
+  if(P.bad||!P.host){add('url_bad','weak','Адрес не разобрать','Проверьте, что ссылка скопирована целиком.',String(raw).slice(0,60));return hits;}
+  const {u,host,uhost}=P;
+  if(u.username||u.password)add('url_at','critical','В адрес спрятаны логин или «@»','Всё, что стоит до @, браузер не считает адресом сайта: настоящий сайт — после @. Так маскируют поддельные страницы.',(u.username||'')+'@');
+  if(P.explicit&&P.scheme==='http')add('url_http','weak','Нет защищённого соединения','Адрес начинается с http://. Но и https не доказывает, что сайт честный.','http://');
+  const ip=/^\d{1,3}(\.\d{1,3}){3}$/.test(host)||host.startsWith('[');
+  if(ip)add('url_ip','strong','Вместо имени сайта — IP-адрес','Организации не присылают ссылки на набор цифр.',host);
+  if(!ip){const labels=uhost.split('.'),tld=labels[labels.length-1];
+    const mixed=labels.find(l=>{const sc=scriptsOf(l);return (sc.lat&&sc.cyr)||(sc.grk&&(sc.lat||sc.cyr));});
+    if(mixed)add('url_mix','strong','Буквы разных алфавитов в одном слове адреса','Так подделывают известные адреса: русская «о» и латинская «o» выглядят одинаково.',mixed);
+    else{const cyrLike=labels.slice(0,-1).find(l=>scriptsOf(l).cyr&&CYR_LOOKALIKE.test(l));
+      if(cyrLike&&!/^(рф|рус|москва|дети|сайт|онлайн)$/.test(tld))add('url_confusable','strong','Кириллица, похожая на латиницу','Адрес набран русскими буквами, которые выглядят как латинские, в нелатинской зоне.',cyrLike);}
+    if(/(^|\.)xn--/.test(host)&&!mixed&&uhost!==host&&!scriptsOf(uhost).cyr)add('url_puny','medium','Адрес закодирован (xn--)','Под кодом могут быть символы, похожие на обычные буквы. Раскодированный адрес: '+uhost,host);
+    if(SHORTENERS.test(host))add('url_short','weak','Короткая ссылка скрывает адрес','Куда она ведёт, не видно, пока не откроете.',host);
+    const risky=RISKY_TLD.test(host);if(risky)add('url_tld','weak','Зона, популярная у одноразовых сайтов','Такие домены дёшевы. Сама по себе зона — не доказательство.','.'+tld);
+    const lure=[...new Set((host.match(LURE_RE)||[]).map(x=>x.toLowerCase()))];
+    if(lure.length)add('url_lure','weak','Слова-приманки в адресе','«'+lure.slice(0,3).join('», «')+'» — так адрес делают похожим на банк, оплату или госуслуги. У настоящих сервисов они тоже бывают.',lure[0]);
+    const hy=(host.match(/-/g)||[]).length,deep=labels.length>=4;
+    if(deep||hy>=2)add('url_long','weak','Длинный составной адрес','Много дефисов и поддоменов — частый приём поддельных сайтов.',host);
+    if(lure.length&&(risky||hy>=2||deep))add('url_combo','strong','Приманка в одноразовом адресе','Слова «оплата», «вход», «госуслуги» в дешёвой зоне или в длинном составном адресе — типичный фишинг.',host);}
+  if(u.port&&!['80','443'].includes(u.port))add('url_port','medium','Нестандартный порт','Обычные сайты не указывают порт в адресе.',':'+u.port);
+  const file=(u.pathname.match(/[^\/]+\.(apk|exe|scr|msi|bat|cmd|js|vbs|jar|zip|rar|7z|iso|dmg)$/i)||[])[0];
+  if(file)add('url_file','critical','Ссылка скачивает файл-программу','Так распространяют вредоносные программы, в том числе для удалённого доступа к телефону.',file);
+  for(const [k,v] of u.searchParams){if(REDIR_KEYS.test(k)&&/^(https?:)?\/\/|^www\./i.test(v)||/^https?:\/\//i.test(v)){add('url_redirect','medium','Ссылка перенаправляет на другой адрес','Настоящий адрес назначения спрятан в параметре ссылки.',k+'='+v.slice(0,40));break;}}
   return hits;}
 /* --- правила для писем --- */
 const FREE_MAIL=/^(gmail\.com|mail\.ru|bk\.ru|inbox\.ru|list\.ru|internet\.ru|yandex\.(ru|com)|ya\.ru|rambler\.ru|outlook\.com|hotmail\.com|icloud\.com|proton\.me|protonmail\.com)$/i;
-const ORG_RE=/(банк|госуслуг|налог|фнс|пенсион|соцфонд|социальн\S* фонд|полици|мвд|фсб|суд\b|судебн|приставы|фссп|центробанк|банк росси|росфинмониторинг|служба поддержки|служба безопасности|администраци|ведомств)/i;
-function mailRules(m){const hits=[];const add=(id,t,why,w,q)=>hits.push({id,title:t,explanation:why,w,quote:q||''});
+const ORG_RE=/(банк|госуслуг|налог|фнс|пенсион|соцфонд|социальн\S* фонд|полици|мвд|фсб|судебн|приставы|фссп|центробанк|банк росси|росфинмониторинг|служба поддержки|служба безопасности|администраци|ведомств)/i;
+function mailRules(m){const hits=[];const add=(id,tier,t,why,q)=>hits.push({id,tier,title:t,explanation:why,quote:q||''});
   const addr=(m.from.match(/[\w.+-]+@([\w.-]+\.[a-zа-я]{2,})/i)||[]);const dom=(addr[1]||'').toLowerCase();
   const claimsOrg=ORG_RE.test(m.from+' '+m.subj+' '+m.body);
-  if(dom&&FREE_MAIL.test(dom)&&claimsOrg)add('mail_free','«Организация» пишет с бесплатной почты','Банки и ведомства пишут со своих доменов, а не с личных ящиков.',35,addr[0]);
-  if(dom){urlRules(dom).filter(h=>['url_tld','url_lure','url_mix','url_puny','url_long'].includes(h.id)).forEach(h=>hits.push(Object.assign({},h,{id:'mail_'+h.id,title:'Адрес отправителя: '+h.title.toLowerCase(),w:Math.round(h.w*.8)})));}
-  else if(m.from)add('mail_noaddr','Не видно адреса отправителя','Посмотрите полный адрес, а не только имя: имя можно написать любое.',5,'');
-  const att=(m.subj+' '+m.body).match(/[^\s«»"']+\.(zip|rar|7z|exe|apk|scr|js|iso|html?|docm|xlsm)\b|вложени\S*|архив\S*/i);
-  if(att)add('mail_attach','Предлагают открыть вложение','Во вложениях к таким письмам часто прячут вредоносные программы или поддельные формы входа.',30,att[0]);
+  if(dom&&FREE_MAIL.test(dom)&&claimsOrg)add('mail_free','strong','«Организация» пишет с бесплатной почты','Банки и ведомства пишут со своих доменов, а не с личных ящиков.',addr[0]);
+  if(dom){urlRules(dom).filter(h=>['url_tld','url_lure','url_mix','url_confusable','url_puny','url_long','url_combo'].includes(h.id)).forEach(h=>hits.push(Object.assign({},h,{id:'mail_'+h.id,title:'Адрес отправителя: '+h.title.toLowerCase()})));}
+  else if(m.from)add('mail_noaddr','weak','Не видно адреса отправителя','Посмотрите полный адрес, а не только имя: имя можно написать любое.','');
+  const mt=m.subj+' '+m.body,att=mt.match(/[^\s«»"']+\.(zip|rar|7z|exe|apk|scr|js|iso|html?|docm|xlsm)\b/i)||mt.match(/вложени\S*|архив\S*/i);
+  if(att)add('mail_attach',/\.(exe|apk|scr|js|iso)\b/i.test(att[0])?'critical':'medium','Предлагают открыть вложение','Во вложениях к таким письмам прячут вредоносные программы или поддельные формы входа.',att[0]);
   return hits;}
 
-/* --- результат правил в общей схеме --- */
-const ACT={codes:'Никому не называйте код — положите трубку или закройте переписку',safe:'Позвоните в банк сами по номеру с обратной стороны карты',auth:'Перезвоните в организацию по номеру с официального сайта, а не по номеру из сообщения',link:'Нужный сервис откройте сами — через приложение или закладку',url:'Не открывайте ссылку; нужный сервис откройте сами — через приложение или закладку',kin:'Позвоните человеку на номер, который знаете сами',drops:'Откажитесь: приём и пересылка чужих денег — уголовная статья',invest:'Проверьте компанию в справочнике участников финрынка на сайте Банка России',app:'Не устанавливайте программы по просьбе собеседника',cash:'Не передавайте наличные курьерам и не вносите их через банкомат по инструкции',wrong:'Предложите «отправителю» вернуть деньги через его банк',mail:'Не отвечайте на письмо и не открывайте вложения',prize:'Не платите «комиссию» за выигрыш или выплату'};
+/* --- результат правил: уровни и семантический приоритет вместо суммы баллов --- */
+const ACT={codes:'Никому не называйте код — положите трубку или закройте переписку',safe:'Позвоните в банк сами по номеру с обратной стороны карты',auth:'Перезвоните в организацию по номеру с официального сайта, а не по номеру из сообщения',link:'Нужный сервис откройте сами — через приложение или закладку',url:'Не открывайте ссылку; нужный сервис откройте сами — через приложение или закладку',kin:'Позвоните человеку на номер, который знаете сами',drops:'Откажитесь: приём и пересылка чужих денег — уголовная статья',invest:'Проверьте компанию в справочнике участников финрынка на сайте Банка России',app:'Не устанавливайте программы по просьбе собеседника',cash:'Не передавайте наличные курьерам и не вносите их через банкомат по инструкции',wrong:'Предложите «отправителю» вернуть деньги через его банк',mail:'Не отвечайте на письмо и не открывайте вложения',prize:'Не платите «комиссию» за выигрыш или выплату',inject:'Не доверяйте тексту, который пытается управлять проверкой: это признак манипуляции'};
+const STRENGTH_T={critical:'есть критические признаки',strong:'есть сильные признаки',medium:'есть признаки средней силы',weak:'только слабые признаки',none:'признаков не найдено'};
+function levelFromTiers(c){if(c.critical)return'critical';if(c.strong)return'high';if(c.medium>=3)return'high';if(c.medium>=2||(c.medium===1&&c.weak>=1))return'medium';if(c.medium===1||c.weak)return'low';return'unknown';}
 function rulesSchema(m){
   const bodyText=m.kind==='url'?m.body:m.kind==='mail'?(m.subj?m.subj+'\n':'')+m.body:m.text,lc=localCheck(bodyText);
-  let hits=lc.hits.filter(h=>!(m.kind==='url'&&h.f.id==='link')).map(h=>({id:h.f.id,title:h.f.t,quote:h.ms[0][0],explanation:h.f.why,w:h.f.w,tr:h.f.tr}));
+  let hits=lc.hits.filter(h=>!(m.kind==='url'&&h.f.id==='link')).map(h=>{const idx=h.ms[0].index||0,neg=['codes','app','cash','safe'].includes(h.f.id)&&negated(bodyText,idx);
+    return{id:h.f.id,tier:neg?'weak':(FLAG_TIER[h.f.id]||'medium'),title:neg?'Упоминание в предупреждении: '+h.f.t.toLowerCase():h.f.t,quote:h.ms[0][0],explanation:neg?'Фраза похожа на совет «не сообщать», а не на просьбу. Всё равно проверьте отправителя.':h.f.why,tr:h.f.tr};});
+  INJECT_RE.lastIndex=0;const inj=INJECT_RE.exec(bodyText||'');if(inj)hits.push({id:'inject',tier:'strong',title:'Текст пытается управлять проверкой',quote:inj[0],explanation:'Честному сообщению незачем давать указания проверяющей программе. Это признак манипуляции.'});
   if(m.kind==='url')hits=urlRules(m.url).concat(hits);
   if(m.kind==='mail')hits=mailRules(m).concat(hits);
-  hits.sort((a,b)=>b.w-a.w);
-  const score=Math.min(100,hits.reduce((a,h)=>a+h.w,0)),n=hits.length;
-  const level=!n?'unknown':score>=75?'critical':score>=45?'high':score>=20?'medium':'low';
-  const conf=!n?null:n===1?.45:n===2?.6:n===3?.7:.8;
-  const ids=new Set(hits.map(h=>h.id.startsWith('url_')?'url':h.id.startsWith('mail_')?'mail':h.id));
-  const rec=[...ids].map(i=>ACT[i]).filter(Boolean).slice(0,3);
+  hits.sort((a,b)=>TIER[b.tier].n-TIER[a.tier].n);
+  const cnt={critical:0,strong:0,medium:0,weak:0};hits.forEach(h=>cnt[h.tier]++);
+  const level=levelFromTiers(cnt),top=cnt.critical?'critical':cnt.strong?'strong':cnt.medium?'medium':cnt.weak?'weak':'none';
+  const ids=new Set(hits.filter(h=>h.tier!=='weak'||hits.length===1).map(h=>h.id.startsWith('url_')?'url':h.id.startsWith('mail_')?'mail':h.id));
+  const rec=[...ids].map(i=>own(ACT,i)?ACT[i]:null).filter(Boolean).slice(0,3);
   if(!rec.length)rec.push('Если сомневаетесь, свяжитесь с организацией или человеком по известному вам номеру');
   const lim=['Правила ищут типовые фразы и приметы адресов. Контекст, иронию и новые схемы они не понимают.'];
-  if(m.kind==='url')lim.push('Страницу никто не открывал: проверен только адрес. Замок и https не означают, что сайт честный.');
+  if(m.kind==='url')lim.push('Страницу никто не открывал: проверен только адрес. Репутацию сайта, DNS и содержимое страницы тренажёр не проверяет. Замок и https не означают, что сайт честный.');
   if(m.kind==='mail')lim.push('Адрес отправителя можно подделать, поэтому проверка по нему не окончательная.');
-  if(!n)lim.unshift('Типовых признаков не нашлось, но это не значит, что всё безопасно.');
+  if(!hits.length)lim.unshift('Типовых признаков не нашлось, но это не значит, что всё безопасно.');
   if(imgs.length)lim.push('Скриншоты правила не читают — их разберёт только ИИ.');
-  return{risk_level:level,confidence:conf,detected_indicators:hits.slice(0,6),explanation:!n?'Правила не нашли типовых признаков обмана. Оценить риск без контекста нельзя.':level==='critical'||level==='high'?'Найдены сильные признаки мошеннической схемы.':'Есть отдельные признаки, характерные для обмана. Проверьте через независимый канал.',
-    limitations:lim,recommended_actions:rec,avoid_actions:['Не сообщайте коды из СМС, пароли и данные карты','Не переводите деньги и не берите кредиты по чужой просьбе',m.kind==='mail'?'Не открывайте вложения и ссылки из письма':'Не переходите по ссылкам из сообщения и ничего там не вводите'],sources:[],score,hits:lc.hits};}
+  const expl=!hits.length?(m.kind==='url'?'В адресе нет типичных признаков подделки. Сам по себе адрес не доказывает, что сайт честный.':'Правила не нашли типовых признаков обмана. Оценить риск без контекста нельзя.'):level==='critical'?'Есть критический признак: так действуют мошенники, когда человек уже на шаг от потери денег или доступа.':level==='high'?'Найдены сильные признаки мошеннической схемы.':level==='medium'?'Есть признаки, характерные для обмана. Проверьте через независимый канал.':'Есть только слабые признаки. Само по себе это не говорит об обмане.';
+  return{risk_level:level,confidence:null,strength:STRENGTH_T[top],detected_indicators:hits.slice(0,8),explanation:expl,
+    limitations:lim,recommended_actions:rec,avoid_actions:['Не сообщайте коды из СМС, пароли и данные карты','Не переводите деньги и не берите кредиты по чужой просьбе',m.kind==='mail'?'Не открывайте вложения и ссылки из письма':'Не переходите по ссылкам из сообщения и ничего там не вводите'],sources:[],tiers:cnt,hits:lc.hits};}
 
 /* --- нормализация ответа ИИ: только допустимые значения, цитаты — только дословные --- */
 const squash=t=>String(t||'').toLowerCase().replace(/[«»"'“”„]/g,'').replace(/\s+/g,' ').trim();
 function normSchema(j,material){j=j&&typeof j==='object'?j:{};
-  const lv=String(j.risk_level||'').toLowerCase().trim(),level=RISK[lv]?lv:'unknown';
+  const lv=String(j.risk_level||'').toLowerCase().trim(),level=own(RISK,lv)?lv:'unknown';
   let c=typeof j.confidence==='string'?parseFloat(j.confidence.replace(',','.')):+j.confidence;
   if(!Number.isFinite(c))c=null;else{if(c>1)c=c/100;c=Math.max(0,Math.min(1,c));}
   const arr=(x,n)=>(Array.isArray(x)?x:[]).filter(v=>v!=null&&v!=='').slice(0,n);
@@ -88,18 +124,19 @@ function normSchema(j,material){j=j&&typeof j==='object'?j:{};
   const ind=arr(j.detected_indicators,5).filter(i=>i&&typeof i==='object').map(i=>{let q=String(i.quote||'').slice(0,200);if(q&&!mat.includes(squash(q)))q='';return{id:String(i.id||'').slice(0,40),title:String(i.title||'').slice(0,140),quote:q,explanation:String(i.explanation||'').slice(0,400)};}).filter(i=>i.title);
   const strs=x=>arr(x,4).map(v=>String(v).slice(0,300));
   let lim=strs(j.limitations);if(!lim.length)lim=['ИИ видит только присланный материал: он не может проверить номер, сайт или собеседника и иногда ошибается.'];
-  if(!RISK[lv])lim.unshift('ИИ ответил не по схеме, поэтому уровень риска не определён.');
-  return{risk_level:level,confidence:c,detected_indicators:ind,explanation:String(j.explanation||'').slice(0,600),limitations:lim,recommended_actions:strs(j.recommended_actions),avoid_actions:strs(j.avoid_actions),sources:arr(j.source_ids,4).map(String).filter(k=>SRC[k])};}
+  if(!own(RISK,lv))lim.unshift('ИИ ответил не по схеме, поэтому уровень риска не определён.');
+  return{risk_level:level,confidence:c,detected_indicators:ind,explanation:String(j.explanation||'').slice(0,600),limitations:lim,recommended_actions:strs(j.recommended_actions),avoid_actions:strs(j.avoid_actions),sources:arr(j.source_ids,4).map(String).filter(k=>own(SRC,k))};}
 
 /* --- отображение в одной схеме --- */
 function riskScale(level){const n=RISK[level].n,k=RISK[level].k;return el('div',{class:'rscale','aria-hidden':'true'},['low','medium','high','critical'].map(l=>el('i',{class:n&&RISK[l].n<=n?'on '+k:''})));}
 function renderVerdict(box,r,meta){box.innerHTML='';const v=RISK[r.risk_level],ai=meta.engine==='ai';
   box.append(el('div',{class:'ph'},el('h2',{text:meta.title}),el('span',{class:'small faint',text:ai?'мнение ИИ, не факт':'правила в браузере, без ИИ'})));
   box.append(el('div',{class:'rl'},riskScale(r.risk_level),el('div',{class:'stack',style:'gap:2px'},el('b',{class:'rl-t '+v.k,text:v.t}),
-    el('span',{class:'small muted',text:r.confidence==null?(ai?'Уверенность модель не указала':'Уверенность не оценивается — нет признаков'):'Уверенность '+(ai?'модели':'правил')+': '+Math.round(r.confidence*100)+'%'}))));
+    el('span',{class:'small muted',text:ai?(r.confidence==null?'Уверенность модель не указала':'Модель оценивает свою уверенность как '+(r.confidence>=.75?'высокую':r.confidence>=.45?'среднюю':'низкую')+' (самооценка, не откалибрована)'):'Сила признаков: '+(r.strength||'признаков не найдено')}))));
   if(r.explanation)box.append(el('p',{text:r.explanation}));
   if(meta.pii)box.append(meta.pii);
-  if(r.detected_indicators.length)box.append(el('div',{class:'stack'},r.detected_indicators.map(i=>el('div',{class:'flag'},el('b',{text:i.title}),i.quote?el('q',{text:i.quote}):null,el('span',{class:'small muted',text:i.explanation})))));
+  if(r.detected_indicators.length)box.append(el('div',{class:'stack'},r.detected_indicators.map(i=>el('div',{class:'flag'},el('div',{class:'row',style:'gap:8px;flex-wrap:wrap'},el('b',{text:i.title}),i.tier&&own(TIER,i.tier)?el('span',{class:'tag '+TIER[i.tier].k,text:TIER[i.tier].t}):null),i.quote?el('q',{text:i.quote}):null,el('span',{class:'small muted',text:i.explanation})))));
+  if(meta.conflict)box.append(meta.conflict);
   if(meta.after)meta.after.forEach(x=>x&&box.append(x));
   const lst=(h,a)=>a.length?el('div',{class:'stack',style:'gap:6px'},el('h3',{text:h}),el('ul',{class:'clean'},a.map(x=>el('li',{text:x})))):null;
   if(r.recommended_actions.length||r.avoid_actions.length)box.append(el('div',{class:'g2'},lst('Что сделать',r.recommended_actions),lst('Чего не делать',r.avoid_actions)));
@@ -137,12 +174,13 @@ $('#ckGo').onclick=async()=>{const m=ckMaterial(),errs=ckValidate(m);if(errs.len
   const box=$('#ckAI');box.hidden=false;box.innerHTML='';
   const toLocal=el('button',{class:'btn sm',onclick:()=>$('#ckLocal').scrollIntoView({behavior:'smooth',block:'start'})},'К результату правил');
   if(!AI.ready||AI.limited()){box.append(el('div',{class:'verdict warn'},el('b',{text:'AI-детектив сейчас недоступен'}),el('span',{text:AI.label()+'. Результат правил в той же схеме — в блоке «Быстрая проверка».'}),el('div',{class:'row'},toLocal)));return;}
-  const c=await Privacy.confirm({text:m.text,images:imgs,purpose:'разбор'});if(!c.ok){box.hidden=true;return;}
+  const c=await Privacy.confirm({purpose:'проверка AI-детективом',key:'detective',parts:[{label:'Материал для проверки',text:m.text,user:true,edit:true}],images:imgs});if(!c.ok){box.hidden=true;return;}
   box.append(el('div',{class:'ph'},el('h2',{text:'Разбор AI-детектива'}),el('span',{class:'small muted',text:'Анализирую… обычно до минуты'})));box.scrollIntoView({behavior:'smooth',block:'start'});$('#ckGo').disabled=true;
   const r=await Mentor.analyze(m.kind,c.text,imgs);$('#ckGo').disabled=false;box.innerHTML='';
   if(!r.ok){box.append(el('div',{class:'verdict warn'},el('b',{text:'AI-детектив не ответил'}),el('span',{text:AI.msg(r.err)+' Пока ориентируйтесь на результат правил — он в той же схеме.'}),el('div',{class:'row'},toLocal)));return;}
-  const res=normSchema(r.data,c.text),pf=Privacy.mask(m.text).found;
-  renderVerdict(box,res,{engine:'ai',title:'Разбор AI-детектива',notes:[Object.keys(pf).length?Privacy.summary(pf).replace(/\.$/,'')+' перед отправкой.':null,r.note,'ИИ может ошибаться. При сомнении положите трубку и свяжитесь с организацией сами по официальному номеру.']});};
+  const res=normSchema(r.data,c.text),pf=Privacy.mask(m.text).found,rules=rulesSchema(m);let conflict=null;
+  if(RISK[rules.risk_level].n>=3&&RISK[rules.risk_level].n-RISK[res.risk_level].n>=1){conflict=el('div',{class:'verdict warn'},el('b',{text:'Правила нашли более серьёзные признаки'}),el('span',{class:'small',text:'ИИ оценил риск как «'+RISK[res.risk_level].t.toLowerCase()+'», но правила нашли: '+rules.strength+'. Показываем более осторожную оценку.'}));res.risk_level=rules.risk_level;}
+  renderVerdict(box,res,{engine:'ai',title:'Разбор AI-детектива',conflict,notes:[Object.keys(pf).length?Privacy.summary(pf).replace(/\.$/,'')+' перед отправкой.':null,r.note,'ИИ может ошибаться. При сомнении положите трубку и свяжитесь с организацией сами по официальному номеру.']});};
 
 /* --- экстренный режим на главной --- */
 const EM_SIT=[

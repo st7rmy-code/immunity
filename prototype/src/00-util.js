@@ -11,9 +11,14 @@ function fmtSec(ms){return ms==null?'—':(ms/1000).toFixed(ms<10000?1:0).replac
 function mmss(s){s=Math.max(0,Math.round(s));const h=Math.floor(s/3600);const m=Math.floor(s%3600/60),x=s%60;return (h?h+':'+String(m).padStart(2,'0'):String(m).padStart(2,'0'))+':'+String(x).padStart(2,'0');}
 function clock(){const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
 function pct(v,d=0){return v==null?'—':(v*100).toFixed(d).replace('.',',')+'%';}
-function srcLink(k){const s=SRC[k];return s?el('span',{class:'src'},'Источник: ',el('a',{href:s.u,target:'_blank',rel:'noopener'},s.n),', '+s.d):null;}
+function srcLink(k){if(Array.isArray(k)){const l=k.map(srcLink).filter(Boolean);return l.length?el('span',{class:'stack',style:'gap:2px'},...l):null;}const s=own(SRC,k)?SRC[k]:null;return s?el('span',{class:'src'},'Источник: ',el('a',{href:s.u,target:'_blank',rel:'noopener'},s.n),', '+s.d+(s.chk?' · проверено '+s.chk:'')):null;}
 function parseJSON(t){const m=String(t).match(/\{[\s\S]*\}/);if(!m)throw{code:'parse'};try{return JSON.parse(m[0]);}catch(e){throw{code:'parse'};}}
 function initials(n){if(/^[+\d]/.test(n))return '#';const em=n.match(/\p{Extended_Pictographic}/u);if(em&&n.indexOf(em[0])===0)return em[0];const w=n.replace(/[«»"().,·|]/g,' ').split(/\s+/).filter(x=>/^[А-ЯЁA-Z]/i.test(x));return ((w[0]||'?')[0]+((w[1]||'')[0]||'')).toUpperCase();}
+/* Безопасные справочники: собственные свойства и запрет служебных ключей (защита от загрязнения прототипов) */
+const own=(o,k)=>o!=null&&(typeof k==='string'||typeof k==='number')&&Object.prototype.hasOwnProperty.call(o,k);
+const BAD_KEYS=new Set(['__proto__','constructor','prototype']);
+const safeKey=k=>typeof k==='string'&&k.length>0&&k.length<=80&&!BAD_KEYS.has(k);
+const dict=o=>Object.setPrototypeOf(o,null); // справочник без прототипа: CATS['__proto__'] → undefined
 const LVL={1:'Базовый',2:'Средний',3:'Сложный'};
 const RES_T={ok:'без потерь',warn:'с ошибками',bad:'попались'};
 const KIND_T={call:'Звонок',chat:'Переписка',site:'Сайт',card:'Верю — не верю',item:'Проверка'};

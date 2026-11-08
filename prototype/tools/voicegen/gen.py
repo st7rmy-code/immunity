@@ -1,4 +1,4 @@
-"""Озвучка реплик тренажёра голосами Silero (CC BY-NC 4.0).
+"""Озвучка реплик тренажёра голосами Silero (файл LICENSE модели: CC BY-NC-SA 4.0, см. docs/THIRD_PARTY.md).
 Вход: tools/voicegen/lines.json  [{k, spk, text}]
 Выход: public/v/<k>.mp3 и src/03c-voices.js (ключ -> длительность)."""
 import json, os, re, subprocess, sys, wave, time
@@ -65,6 +65,6 @@ for i, x in enumerate(lines):
 prev = {}
 path = os.path.join(ROOT, 'src', '03c-voices.js')
 with open(path, 'w', encoding='utf-8') as f:
-    f.write('/* Заранее озвученные реплики (Silero TTS, CC BY-NC 4.0): ключ → длительность, с. Генерируется voicegen/gen.py. */\n')
+    f.write('/* Заранее озвученные реплики (Silero TTS v5_6_ru, CC BY-NC-SA 4.0, см. docs/THIRD_PARTY.md): ключ → длительность, с. Генерируется voicegen/gen.py. */\n')
     f.write('const VOICE_FILES=' + json.dumps(man, separators=(',', ':')) + ';\n')
 print('done', len(man), 'files', round(sum(man.values())), 's audio', round(sum(os.path.getsize(os.path.join(OUT, k + '.mp3')) for k in man) / 1e6, 2), 'MB')

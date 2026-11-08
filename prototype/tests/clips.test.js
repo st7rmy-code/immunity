@@ -1,10 +1,10 @@
-const {chromium}=require('playwright');const fs=require('fs');
+const {launch,args}=require('./browser.js');const fs=require('fs');
 const path=require('path');const SP=path.resolve(__dirname,'..'),out=SP+'/tests/out/';
 const page0=fs.readFileSync(SP+'/dist/artifact.html','utf8');
 const SPY=`<script>(function(){window.__played=[];const P=HTMLMediaElement.prototype.play;HTMLMediaElement.prototype.play=function(){window.__played.push(this.src.split('/').pop());return P.call(this);};
 window.__spoken=[];const q=[];Object.defineProperty(window,'speechSynthesis',{value:{getVoices:()=>[{name:'Google русский',lang:'ru-RU',localService:false}],speaking:false,addEventListener(){},cancel(){q.length=0;},speak(u){window.__spoken.push(u.text);setTimeout(()=>u.onend&&u.onend({}),30);}},configurable:true});window.SpeechSynthesisUtterance=function(t){this.text=t;};})();</script>`;
 fs.writeFileSync(out+'clips.html','<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+SPY+'</head><body>'+page0+'</body></html>');
-(async()=>{const b=await chromium.launch({args:['--autoplay-policy=no-user-gesture-required']});const errs=[],need=(c,m)=>{if(!c)errs.push(m);};
+(async()=>{const b=await launch(args(['--autoplay-policy=no-user-gesture-required']));const errs=[],need=(c,m)=>{if(!c)errs.push(m);};
  const p=await (await b.newContext({viewport:{width:1280,height:900}})).newPage();p.on('pageerror',e=>errs.push(e.message));
  await p.goto('file://'+out+'clips.html');await p.waitForTimeout(400);
  need(await p.evaluate(()=>hasClips()&&useRecorded({mode:'call'})),'clips not detected');

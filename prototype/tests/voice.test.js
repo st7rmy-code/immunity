@@ -1,4 +1,4 @@
-const {chromium}=require('playwright');
+const {launch,args}=require('./browser.js');
 const fs=require('fs');
 const path=require('path');const SP=path.resolve(__dirname,'..');
 const out=SP+'/tests/out/';
@@ -15,7 +15,7 @@ window.webkitSpeechRecognition=FakeRec;window.SpeechRecognition=FakeRec;
 const wrap=h=>'<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+h+'</head><body>'+page0+'</body></html>';
 fs.writeFileSync(out+'voice.html',wrap(FAKE));
 fs.writeFileSync(out+'nostt.html',wrap(FAKE.replace('window.webkitSpeechRecognition=FakeRec;window.SpeechRecognition=FakeRec;','delete window.webkitSpeechRecognition;delete window.SpeechRecognition;window.webkitSpeechRecognition=undefined;window.SpeechRecognition=undefined;')));
-(async()=>{const b=await chromium.launch();const errs=[],log=(...a)=>console.log(...a),need=(c,m)=>{if(!c)errs.push(m);};
+(async()=>{const b=await launch();const errs=[],log=(...a)=>console.log(...a),need=(c,m)=>{if(!c)errs.push(m);};
   const ctx=await b.newContext({viewport:{width:1280,height:900}});const p=await ctx.newPage();
   p.on('pageerror',e=>errs.push('pageerror: '+e.message));
   await p.goto('file://'+out+'voice.html');await p.waitForTimeout(400);

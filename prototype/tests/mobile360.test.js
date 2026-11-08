@@ -1,6 +1,6 @@
-const {chromium}=require('playwright');
+const {launch,args}=require('./browser.js');
 const fs0=require('fs');fs0.writeFileSync(require('path').resolve(__dirname,'out/plain360.html'),'<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>'+fs0.readFileSync(require('path').resolve(__dirname,'../dist/artifact.html'),'utf8')+'</body></html>');
-(async()=>{const b=await chromium.launch();const ctx=await b.newContext({viewport:{width:360,height:780},hasTouch:true,isMobile:true});const p=await ctx.newPage();const errs=[];
+(async()=>{const b=await launch();const ctx=await b.newContext({viewport:{width:360,height:780},hasTouch:true,isMobile:true});const p=await ctx.newPage();const errs=[];
 p.on('pageerror',e=>errs.push(e.message));
 await p.goto('file://'+require('path').resolve(__dirname,'out/plain360.html'));await p.waitForTimeout(300);
 const chk=async t=>{const o=await p.evaluate(()=>{const W=360;return {sw:document.documentElement.scrollWidth,bad:[...document.querySelectorAll('body *')].filter(e=>{const r=e.getBoundingClientRect();return r.width>0&&r.right>W+1&&!e.closest('.seg,nav.tabs,.tbl,pre')}).slice(0,3).map(e=>e.tagName+'.'+String(e.className).slice(0,24)+'#'+e.id+':'+Math.round(e.getBoundingClientRect().right))}});if(o.sw>361)errs.push(t+' '+o.sw+' '+o.bad.join(' | '));};

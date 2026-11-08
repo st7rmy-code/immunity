@@ -1,72 +1,107 @@
 /* ===== ЯДРО: хранилище, приватность, ИИ-сервис, оценка навыков, рекомендации. Без DOM, кроме окна согласия. ===== */
 
 /* --- Хранилище v2: версия схемы, перенос с v1, экспорт/импорт, проверка ввода --- */
-const RES_S={ok:1,warn:.5,bad:0};
+const RES_S=dict({ok:1,warn:.5,bad:0});
+const KINDS=['call','chat','site','card','item'];
+const TS_MIN=Date.UTC(2024,0,1);
+const tsOk=v=>{v=+v;return Number.isFinite(v)&&v>=TS_MIN&&v<=Date.now()+864e5?Math.round(v):null;};
 const Store={
-  key:'immunitet.v2',old:'immunitet.v1',max:800,
+  key:'immunitet.v2',old:'immunitet.v1',max:800,importMax:3e6,
   blank(){return{v:2,aud:null,large:false,coach:true,voice:true,vMale:'',vFemale:'',vRate:1,handsFree:false,callVoice:'voice',femVoice:'',tab:'home',prot:{},attempts:[],tests:[],review:{},forms:null,created:Date.now()};},
   load(){const d=store.get(this.key,null);if(d&&d.v===2)return this.sanitize(d)||this.blank();return this.sanitize(this.migrate(store.get(this.old,null)))||this.blank();},
-  migrate(o){const d=this.blank();if(!o||typeof o!=='object')return d;
-    ['aud','large','coach','voice','tab'].forEach(k=>{if(o[k]!=null)d[k]=o[k];});if(o.tab==='check')d.tab='mentor';
-    if(o.prot&&typeof o.prot==='object')d.prot=o.prot;
-    (Array.isArray(o.hist)?o.hist:[]).slice().reverse().forEach(h=>{if(!h||h.id==='swipe'||!(h.res in RES_S))return;const sc=scenarioById(h.m,h.id);if(!sc)return;
-      d.attempts.push({k:h.m,id:h.id,sk:sc.cat,lvl:sc.lvl,res:h.res,s:RES_S[h.res],ts:+h.ts||Date.now(),legit:!!sc.honest,mk:h.res==='ok'?[]:(sc.mk||[]),mig:1});});
-    if(o.hist&&o.hist.length)d.migrated=1;return d;},
-  sanitize(d){if(!d||typeof d!=='object')return null;const o=this.blank();
-    o.aud=AUDS[d.aud]?d.aud:null;o.large=!!d.large;o.coach=d.coach!==false;o.voice=d.voice!==false;o.tab=typeof d.tab==='string'?d.tab.slice(0,12):'home';
-    o.vMale=typeof d.vMale==='string'?d.vMale.slice(0,120):'';o.vFemale=typeof d.vFemale==='string'?d.vFemale.slice(0,120):'';o.vRate=+d.vRate>=.7&&+d.vRate<=1.4?+d.vRate:1;o.handsFree=!!d.handsFree;o.callVoice=d.callVoice==='ai'?'ai':'voice';o.femVoice=['baya','kseniya','xenia'].includes(d.femVoice)?d.femVoice:'';
-    PROT.forEach(p=>{if(d.prot&&d.prot[p.id]===true)o.prot[p.id]=true;});
-    o.attempts=(Array.isArray(d.attempts)?d.attempts:[]).filter(a=>a&&typeof a==='object'&&CATS[a.sk]&&typeof a.s==='number'&&isFinite(a.s)&&['call','chat','site','card','item'].includes(a.k)).slice(-this.max).map(a=>{
-      const x={k:a.k,id:String(a.id).slice(0,40),sk:a.sk,lvl:[1,2,3].includes(+a.lvl)?+a.lvl:1,s:Math.max(0,Math.min(1,a.s)),ts:+a.ts>0?+a.ts:Date.now()};
-      x.res=a.res in RES_S?a.res:(x.s>=.75?'ok':x.s>=.4?'warn':'bad');if(a.legit)x.legit=true;if(a.fp)x.fp=true;if(+a.ms>0&&+a.ms<36e5)x.ms=Math.round(+a.ms);
-      x.mk=Array.isArray(a.mk)?a.mk.filter(m=>MARKERS[m]).slice(0,6):[];if(a.ph==='pre'||a.ph==='post')x.ph=a.ph;if(a.mig)x.mig=1;if(typeof a.ans==='number')x.ans=a.ans;return x;});
-    o.tests=(Array.isArray(d.tests)?d.tests:[]).filter(t=>t&&(t.phase==='pre'||t.phase==='post')&&(t.form==='A'||t.form==='B')&&Array.isArray(t.ans)).slice(-12).map(t=>({phase:t.phase,form:t.form,ts:+t.ts||Date.now(),rep:!!t.rep,ans:t.ans.filter(x=>x&&ITEM_BY[x.id]).map(x=>({id:x.id,ok:!!x.ok,ms:Math.max(0,Math.min(36e5,+x.ms||0)),a:typeof x.a==='number'?x.a:null}))}));
-    if(d.review&&typeof d.review==='object')Object.entries(d.review).slice(0,300).forEach(([k,v])=>{if(v&&+v.due>0)o.review[String(k).slice(0,50)]={due:+v.due,box:Math.max(1,Math.min(4,+v.box||1))};});
-    if(d.forms&&(d.forms.pre==='A'||d.forms.pre==='B'))o.forms={pre:d.forms.pre,post:d.forms.pre==='A'?'B':'A'};
-    o.created=+d.created||Date.now();if(d.migrated)o.migrated=1;if(d.migratedSeen)o.migratedSeen=1;return o;},
+  /* перенос с v1: берём только известные поля и известные сценарии */
+  migrate(o){const d=this.blank();if(!o||typeof o!=='object'||Array.isArray(o))return d;
+    ['aud','large','coach','voice','tab'].forEach(k=>{if(own(o,k)&&o[k]!=null)d[k]=o[k];});if(o.tab==='check')d.tab='mentor';
+    if(own(o,'prot')&&o.prot&&typeof o.prot==='object')d.prot=o.prot;
+    (Array.isArray(o.hist)?o.hist.slice(-this.max*2):[]).slice().reverse().forEach(h=>{if(!h||typeof h!=='object'||h.id==='swipe'||!own(RES_S,h.res))return;const sc=scenarioById(h.m,h.id);if(!sc)return;
+      d.attempts.push({k:h.m,id:h.id,sk:sc.cat,lvl:sc.lvl,res:h.res,s:RES_S[h.res],ts:tsOk(h.ts)||Date.now(),legit:!!sc.honest,mk:h.res==='ok'?[]:(sc.mk||[]),mig:1});});
+    if(Array.isArray(o.hist)&&o.hist.length)d.migrated=1;return d;},
+  /* проверка состояния: только собственные свойства, известные ключи, конечные числа, ограниченные размеры */
+  sanitize(d){if(!d||typeof d!=='object'||Array.isArray(d))return null;const o=this.blank(),g=k=>own(d,k)?d[k]:undefined;
+    o.aud=own(AUDS,g('aud'))?g('aud'):null;o.large=g('large')===true;o.coach=g('coach')!==false;o.voice=g('voice')!==false;
+    const tab=g('tab');o.tab=typeof tab==='string'&&/^[a-z]{2,12}$/.test(tab)?tab:'home';
+    const str=(v,n)=>typeof v==='string'?v.slice(0,n):'';o.vMale=str(g('vMale'),120);o.vFemale=str(g('vFemale'),120);
+    const vr=+g('vRate');o.vRate=Number.isFinite(vr)&&vr>=.7&&vr<=1.4?vr:1;o.handsFree=g('handsFree')===true;o.callVoice=g('callVoice')==='ai'?'ai':'voice';o.femVoice=['baya','kseniya','xenia'].includes(g('femVoice'))?g('femVoice'):'';
+    const prot=g('prot');PROT.forEach(p=>{if(prot&&typeof prot==='object'&&own(prot,p.id)&&prot[p.id]===true)o.prot[p.id]=true;});
+    const att=g('attempts');
+    o.attempts=(Array.isArray(att)?att.slice(-this.max*3):[]).filter(a=>a&&typeof a==='object'&&!Array.isArray(a)&&KINDS.includes(a.k)&&typeof a.sk==='string'&&own(CATS,a.sk)&&typeof a.s==='number'&&Number.isFinite(a.s)&&typeof a.id==='string'&&safeKey(a.id)&&!!scenarioById(a.k,a.id)).slice(-this.max).map(a=>{
+      const x={k:a.k,id:a.id,sk:a.sk,lvl:[1,2,3].includes(+a.lvl)?+a.lvl:1,s:Math.max(0,Math.min(1,a.s)),ts:tsOk(a.ts)||Date.now()};
+      x.res=typeof a.res==='string'&&own(RES_S,a.res)?a.res:(x.s>=.75?'ok':x.s>=.4?'warn':'bad');if(a.legit===true)x.legit=true;if(a.fp===true)x.fp=true;
+      const ms=+a.ms;if(Number.isFinite(ms)&&ms>0&&ms<36e5)x.ms=Math.round(ms);
+      x.mk=Array.isArray(a.mk)?a.mk.filter(m=>typeof m==='string'&&own(MARKERS,m)).slice(0,6):[];if(a.ph==='pre'||a.ph==='post')x.ph=a.ph;if(a.mig===1||a.mig===true)x.mig=1;
+      if(typeof a.ans==='number'&&Number.isInteger(a.ans)&&a.ans>=0&&a.ans<10)x.ans=a.ans;return x;});
+    const tests=g('tests');
+    o.tests=(Array.isArray(tests)?tests.slice(-24):[]).filter(t=>t&&typeof t==='object'&&(t.phase==='pre'||t.phase==='post')&&(t.form==='A'||t.form==='B')&&Array.isArray(t.ans)).slice(-12).map(t=>({phase:t.phase,form:t.form,ts:tsOk(t.ts)||Date.now(),rep:t.rep===true,
+      ans:t.ans.slice(0,30).filter(x=>x&&typeof x==='object'&&typeof x.id==='string'&&own(ITEM_BY,x.id)).map(x=>{const ms=+x.ms;return{id:x.id,ok:x.ok===true,ms:Number.isFinite(ms)?Math.max(0,Math.min(36e5,ms)):0,a:typeof x.a==='number'&&Number.isInteger(x.a)&&x.a>=0&&x.a<10?x.a:null};})}));
+    const rv=g('review');
+    if(rv&&typeof rv==='object'&&!Array.isArray(rv))Object.keys(rv).slice(0,600).filter(k=>safeKey(k)&&/^(call|chat|site|card|item):[a-z0-9_]{1,40}$/.test(k)).slice(0,300).forEach(k=>{const v=rv[k];const due=v&&typeof v==='object'?+v.due:NaN;if(Number.isFinite(due)&&due>0&&due<Date.now()+4e10)o.review[k]={due,box:Math.max(1,Math.min(4,Math.round(+v.box)||1))};});
+    const fm=g('forms');if(fm&&typeof fm==='object'&&(fm.pre==='A'||fm.pre==='B'))o.forms={pre:fm.pre,post:fm.pre==='A'?'B':'A'};
+    o.created=tsOk(g('created'))||Date.now();if(g('migrated'))o.migrated=1;if(g('migratedSeen'))o.migratedSeen=1;return o;},
   save(){if(!store.set(this.key,S))toast('Не удалось сохранить прогресс в этом браузере');},
   exportText(){return JSON.stringify({app:'immunitet',v:2,exported:new Date().toISOString(),data:S},null,1);},
-  parseImport(txt){let j;try{j=JSON.parse(String(txt||''));}catch(e){return{err:'Это не похоже на файл экспорта: внутри не JSON.'};}
-    if(!j||j.app!=='immunitet'||!j.data)return{err:'В файле нет данных тренажёра «Иммунитет».'};if(j.v!==2)return{err:'Неизвестная версия файла: '+j.v};
+  parseImport(txt){txt=String(txt==null?'':txt);if(txt.length>this.importMax)return{err:'Файл слишком большой для экспорта прогресса (больше 3 МБ).'};
+    let j;try{j=JSON.parse(txt);}catch(e){return{err:'Это не похоже на файл экспорта: внутри не JSON.'};}
+    if(!j||typeof j!=='object'||Array.isArray(j)||j.app!=='immunitet'||!own(j,'data'))return{err:'В файле нет данных тренажёра «Иммунитет».'};
+    if(j.v!==2)return{err:'Неизвестная версия файла: '+String(j.v).slice(0,10)};
     const s=this.sanitize(j.data);return s?{data:s}:{err:'Данные в файле повреждены.'};}
 };
 let S=Store.load();
 function save(){Store.save();}
 
-/* --- Приватность: скрытие персональных данных и согласие на отправку ИИ --- */
+/* --- Приватность: скрытие персональных данных и согласие на отправку ИИ ---
+   Порядок важен: длинные идентификаторы раньше коротких, чтобы от номера не оставался «хвост». */
+const BIRTH_RE=/(?:дат[аы]\s+рождения|д\.\s?р\.|родил(?:ся|ась)|рожд[её]н(?:а)?|ДР)[^\d\n]{0,12}/i;
 const PII=[
- {k:'acct',n:['номер счёта','номера счетов','номеров счетов'],re:/\b\d{20}\b/g,r:'[номер счёта скрыт]'},
- {k:'card',n:['номер карты','номера карт','номеров карт'],re:/(?:\d[ -]?){15,18}\d/g,r:'[номер карты скрыт]'},
- {k:'phone',n:['телефон','телефона','телефонов'],re:/(?:\+7|\b8)[\s(-]*\d{3}[\s)-]*\d{3}[\s-]*\d{2}[\s-]*\d{2}\b/g,r:'[телефон скрыт]'},
- {k:'snils',n:['СНИЛС','СНИЛС','СНИЛС'],re:/\b\d{3}[- ]\d{3}[- ]\d{3}[- ]\d{2}\b/g,r:'[СНИЛС скрыт]'},
- {k:'passport',n:['паспорт','паспорта','паспортов'],re:/\b\d{2}\s?\d{2}\s?(?:№\s?)?\d{6}\b/g,r:'[паспорт скрыт]'},
- {k:'inn',n:['ИНН','ИНН','ИНН'],re:/\b\d{12}\b|\b\d{10}\b/g,r:'[ИНН скрыт]'},
+ {k:'iban',n:['IBAN','IBAN','IBAN'],re:/\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]{4}){3,7}(?:[ ]?[A-Z0-9]{1,4})?\b/g,r:'[IBAN скрыт]'},
+ {k:'acct',n:['номер счёта','номера счетов','номеров счетов'],re:/(?<![\d])\d(?:[ -]?\d){19}(?![ -]?\d)/g,r:'[номер счёта скрыт]'},
+ {k:'card',n:['номер карты','номера карт','номеров карт'],re:/(?<![\d])\d(?:[ -]?\d){15,18}(?![ -]?\d)/g,r:'[номер карты скрыт]'},
+ {k:'bank',n:['банковский реквизит','банковских реквизита','банковских реквизитов'],re:/((?:БИК|КПП|ОГРНИП|ОГРН|ОКПО|корр?\.?\s*сч[её]т|к\/с|р\/с)\D{0,6})(\d(?:[ -]?\d){7,19})/gi,r:null},
+ {k:'phone',n:['телефон','телефона','телефонов'],re:/(?:\+7|(?<![\d+])8)[\s(-]*\d{3}[\s)-]*\d{3}[\s-]*\d{2}[\s-]*\d{2}(?![\d])/g,r:'[телефон скрыт]'},
+ {k:'phoneint',n:['иностранный телефон','иностранных телефона','иностранных телефонов'],re:/\+(?!7)\d{1,3}(?:[\s().-]*\d){6,12}(?![\d])/g,r:'[телефон скрыт]'},
+ {k:'snils',n:['СНИЛС','СНИЛС','СНИЛС'],re:/(?<![\d])\d{3}[- ]\d{3}[- ]\d{3}[- ]\d{2}(?![\d])/g,r:'[СНИЛС скрыт]'},
+ {k:'passport',n:['паспорт','паспорта','паспортов'],re:/(?:(?:паспорт\D{0,12})?сери[яи]\s*\d{2}\s?\d{2}\s*(?:№|номер)?\s*\d{6}|(?<![\d])\d{2}\s?\d{2}\s?№?\s?\d{6}(?![\d]))/gi,r:'[паспорт скрыт]'},
+ {k:'inn',n:['ИНН','ИНН','ИНН'],re:/(?<![\d])(?:\d{12}|\d{10})(?![\d])/g,r:'[ИНН скрыт]'},
  {k:'email',n:['адрес почты','адреса почты','адресов почты'],re:/[\w.+-]+@([\w-]+(?:\.[\w-]+)+)/g,r:(m,d)=>'[имя скрыто]@'+d},
  {k:'cvv',n:['CVV','CVV','CVV'],re:/((?:cvv2?|cvc2?)\D{0,3})(\d{3})\b/gi,r:null},
- {k:'code',n:['код','кода','кодов'],re:/((?:код|code|пароль|password)[^\d\n]{0,14})(\d{4,8})/gi,r:null}
+ {k:'code',n:['код','кода','кодов'],re:/((?:код|code|пароль|password)[^\d\n]{0,14})(\d{4,8})/gi,r:null},
+ {k:'birth',n:['дата рождения','даты рождения','дат рождения'],re:new RegExp(BIRTH_RE.source+'\\d{1,2}[./-]\\d{1,2}[./-](?:19|20)?\\d{2}','gi'),r:'[дата рождения скрыта]'},
+ {k:'olddate',n:['дата','даты','дат'],re:/(?<![\d])\d{1,2}[./]\d{1,2}[./](19\d{2}|200\d|201[0-6])(?![\d])/g,r:'[дата скрыта]'},
+ {k:'address',n:['адрес','адреса','адресов'],re:/(?:ул\.|улица|пр-т|просп\.|проспект|пер\.|переулок|ш\.|шоссе|наб\.|набережная|бульвар|б-р|пл\.|площадь|мкр\.?|микрорайон)\s*[А-ЯЁA-Z0-9][^,\n]{1,40}?(?:,?\s*(?:д\.|дом)\s*\d+[а-яА-Я]?(?:\s*\/\s*\d+)?)(?:,?\s*(?:корп\.|к\.|стр\.)\s*\d+)?(?:,?\s*(?:кв\.|квартира|оф\.)\s*\d+)?/gi,r:'[адрес скрыт]'},
+ {k:'fio',n:['ФИО','ФИО','ФИО'],re:/(?:[А-ЯЁ][а-яё]+(?:-[А-ЯЁ][а-яё]+)?\s+){1,2}[А-ЯЁ][а-яё]+(?:ович|евич|ич|овна|евна|ична|инична|оглы|кызы)(?![а-яё])(?:\s+[А-ЯЁ][а-яё]+(?:ов|ев|ин|ын|ий|ой|ова|ева|ина|ына|ая|ко|ук|юк|ич)(?![а-яё]))?/g,r:'[ФИО скрыто]'},
+ {k:'longnum',n:['длинное число','длинных числа','длинных чисел'],re:/(?<![\d])\d(?:[ -]?\d){10,}(?![\d])/g,r:'[число скрыто]'}
 ];
 const Privacy={
-  session:{text:false,img:false},
-  mask(t){let text=String(t||'');const found={};PII.forEach(p=>{text=text.replace(p.re,(...m)=>{found[p.k]=(found[p.k]||0)+1;return typeof p.r==='function'?p.r(...m):p.r==null?m[1]+'[код скрыт]':p.r;});});return{text,found};},
+  session:Object.create(null),
+  mask(t){let text=String(t||'');const found=Object.create(null);PII.forEach(p=>{p.re.lastIndex=0;text=text.replace(p.re,(...m)=>{found[p.k]=(found[p.k]||0)+1;return typeof p.r==='function'?p.r(...m):p.r==null?m[1]+'[скрыто]':p.r;});});return{text,found};},
   summary(found){const parts=PII.filter(p=>found[p.k]).map(p=>{const n=found[p.k];const w=n%10===1&&n%100!==11?p.n[0]:n%10>=2&&n%10<=4&&(n%100<12||n%100>14)?p.n[1]:p.n[2];return n+' '+w;});return parts.length?'Скрыли автоматически: '+parts.join(', ')+'.':'Автоматически личных данных не нашли — проверьте текст сами.';},
-  /* Показывает, что уйдёт ИИ, и даёт поправить. Разрешает ок только при явном подтверждении. */
-  confirm({text='',images=[],purpose='разбор'}){
-    const m=this.mask(text);
-    if(this.session.text&&(!images.length||this.session.img))return Promise.resolve({ok:true,text:m.text});
+  recipient(){return MODE==='artifact'?'в Claude — модель компании Anthropic — через ваш аккаунт Claude':'на сервер тренажёра, а с него — модели ИИ, подключённой на сервере';},
+  /* Единое окно согласия для всех ИИ-функций. parts — всё, что фактически уйдёт модели:
+     [{label, text, user:true — пользовательские данные (маскируются), edit:true — можно поправить}]. */
+  confirm({purpose='разбор',key='',parts=null,text='',images=[],note=''}){
+    if(!parts)parts=[{label:'Ваш текст',text,user:true,edit:true}];
+    parts=parts.filter(p=>p&&String(p.text||'').trim()).map(p=>{const m=p.user?this.mask(p.text):{text:String(p.text),found:Object.create(null)};return Object.assign({},p,{text:m.text,found:m.found});});
+    const k=key||purpose;
+    if(this.session[k]&&!images.length)return Promise.resolve({ok:true,text:(parts.find(p=>p.edit)||{}).text||'',parts});
     return new Promise(res=>{let done=false;const fin=v=>{if(!done){done=true;res(v);}};
-      const ta=text?el('textarea',{rows:'6','aria-label':'Текст, который уйдёт ИИ'}):null;if(ta)ta.value=m.text;
+      const found=Object.create(null);parts.forEach(p=>Object.keys(p.found).forEach(x=>found[x]=(found[x]||0)+p.found[x]));
+      const hasUser=parts.some(p=>p.user);
+      const views=parts.map(p=>{if(p.edit){const ta=el('textarea',{rows:'6','aria-label':p.label});ta.value=p.text;p.ta=ta;return el('label',{},p.label+' — уберите имена, адреса и всё лишнее',ta);}
+        return el('details',{class:'pv-part',open:parts.length<3?'':null},el('summary',{},p.label+' · '+p.text.length.toLocaleString('ru-RU')+' симв.'),el('pre',{class:'pv-pre',text:p.text.slice(0,4000)+(p.text.length>4000?'\n…':'')}));});
       const imgOk=el('input',{type:'checkbox',id:'pvImg'}),remember=el('input',{type:'checkbox',id:'pvRem'});
       const send=el('button',{class:'btn primary',disabled:images.length?true:null},'Отправить');
       imgOk.onchange=()=>{send.disabled=images.length&&!imgOk.checked;};
       const body=el('div',{class:'stack',style:'gap:12px'},
-        el('p',{class:'small',text:(images.length?'Текст и скриншоты уйдут':'Текст уйдёт')+' в Claude — модель компании Anthropic — через ваш аккаунт Claude. Тренажёр '+(images.length?'их':'его')+' не сохраняет. Ответ ИИ — это мнение, а не установленный факт.'}),
-        text?el('div',{class:'verdict '+(Object.keys(m.found).length?'ok':'warn')},el('span',{class:'small',text:this.summary(m.found)})):null,
-        ta?el('label',{},'Что уйдёт ИИ — уберите имена, адреса и всё лишнее',ta):null,
-        images.length?el('label',{class:'row',style:'gap:10px;color:var(--ink);align-items:flex-start'},imgOk,el('span',{class:'small',text:'Скриншоты ('+images.length+') уйдут как есть. Я закрыл(а) на них номера карт, паспорт, адреса и лица'})):null,
-        el('label',{class:'row',style:'gap:10px;color:var(--ink)'},remember,el('span',{class:'small',text:'Не спрашивать до конца этой сессии'})),
+        el('p',{class:'small',text:'Ниже — всё, что уйдёт '+this.recipient()+'. Тренажёр это не сохраняет. Ответ ИИ — мнение, а не установленный факт.'}),
+        hasUser?el('div',{class:'verdict '+(Object.keys(found).length?'ok':'warn')},el('span',{class:'small',text:this.summary(found)})):null,
+        ...views,note?el('p',{class:'small muted',text:note}):null,
+        images.length?el('div',{class:'lim'},el('b',{class:'small',text:'Скриншоты: '+images.length}),el('span',{class:'small',text:'Личные данные на изображениях автоматически не находятся и не скрываются. Закройте номера карт, паспорт, адреса и лица до отправки.'}),
+          el('label',{class:'row',style:'gap:10px;color:var(--ink);align-items:flex-start;flex-wrap:nowrap'},imgOk,el('span',{class:'small',text:'Я проверил(а) скриншоты и согласен(на) их отправить'}))):null,
+        el('label',{class:'row',style:'gap:10px;color:var(--ink);flex-wrap:nowrap'},remember,el('span',{class:'small',text:'Не спрашивать для «'+purpose+'» до конца сессии'+(images.length?' (скриншоты — спрашивать всегда)':'')})),
         el('div',{class:'row'},send,el('button',{class:'btn',onclick:()=>close()},'Отмена')));
-      const close=modal('Отправить ИИ на '+purpose+'?',body,{onClose:()=>fin({ok:false})});
-      send.onclick=()=>{if(remember.checked){this.session.text=true;if(images.length)this.session.img=true;}const out=ta?this.mask(ta.value).text:'';fin({ok:true,text:out});close();};
+      const close=modal('Отправить ИИ: '+purpose+'?',body,{onClose:()=>fin({ok:false})});
+      send.onclick=()=>{if(remember.checked)this.session[k]=true;
+        const out=parts.map(p=>p.ta?Object.assign({},p,{text:this.mask(p.ta.value).text}):p);out.forEach(p=>delete p.ta);
+        fin({ok:true,text:(out.find(p=>p.edit)||{}).text||'',parts:out});close();};
     });
   }
 };
@@ -100,7 +135,7 @@ const Evidence={
   W:{item:1,call:1,chat:1,site:1,card:.35},L:{1:.8,2:1,3:1.25},NOV:[1,.5,.25,.15,.1],HALF:90,subs:[],
   on(f){this.subs.push(f);},
   record(a){a.ts=Date.now();S.attempts.push(a);if(S.attempts.length>Store.max)S.attempts.splice(0,S.attempts.length-Store.max);this.schedule(a);save();this.subs.forEach(f=>{try{f(a);}catch(e){}});},
-  recordMany(list){const t=Date.now();list.forEach((a,i)=>{a.ts=t+i;S.attempts.push(a);});save();this.subs.forEach(f=>{try{f();}catch(e){}});},
+  recordMany(list){const t=Date.now();list.forEach((a,i)=>{a.ts=t+i;S.attempts.push(a);});if(S.attempts.length>Store.max)S.attempts.splice(0,S.attempts.length-Store.max);save();this.subs.forEach(f=>{try{f();}catch(e){}});},
   schedule(a){if(a.k==='item'||a.k==='card')return;const key=a.k+':'+a.id,r=S.review[key],D=864e5;
     if(a.res!=='ok')S.review[key]={due:Date.now()+20*36e5,box:1};
     else if(r){const box=r.box+1;if(box>4)delete S.review[key];else S.review[key]={due:Date.now()+[0,1,3,7,21][box]*D,box};}},

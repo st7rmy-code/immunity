@@ -1,9 +1,9 @@
 /* ===== Голоса собеседников и ответ голосом в звонке ===== */
-const VOICE_P={bank_safe:{g:'f',rate:1.02},fsb_declare:{g:'m',rate:.97},rosfin_fake:{g:'f'},gos_hack:{g:'f',rate:1.04},operator:{g:'f',rate:1.05},socfond:{g:'f'},exam:{g:'f',rate:1.06},grandson:{g:'m',rate:1.1},intercom:{g:'m'},courier:{g:'f',rate:1.04},boss:{g:'m'},honest_bank:{g:'f'},honest_delivery:{g:'m',rate:1.04},boss_voice:{g:'m',rate:1.07},daughter_voice:{g:'f',rate:1.05}};
-function guessG(who){who=String(who||'');const w=who.trim().split(/\s+/)[0]||'';return /(овна|евна|ична)\b/i.test(who)||/^(мама|мам|бабушка|дочь|сестра|катя|аня|лена|оля|маша|таня|наташа|алина|елена|татьяна|подруга)/i.test(w)?'f':'m';}
-function voiceOf(sc){const p=VOICE_P[sc&&sc.id]||{};return{g:p.g||guessG(sc&&sc.who),rate:p.rate||1,pitch:1};}
-const DIGIT_W={'ноль':0,'нуль':0,'один':1,'одна':1,'раз':1,'два':2,'две':2,'три':3,'четыре':4,'пять':5,'шесть':6,'семь':7,'восемь':8,'девять':9};
-function digitsOf(t){return String(t||'').toLowerCase().split(/[^0-9а-яё]+/).map(w=>/^\d+$/.test(w)?w:w in DIGIT_W?String(DIGIT_W[w]):'').join('');}
+const VOICE_P=dict({bank_safe:{g:'f',rate:1.02},fsb_declare:{g:'m',rate:.97},rosfin_fake:{g:'f'},gos_hack:{g:'f',rate:1.04},operator:{g:'f',rate:1.05},socfond:{g:'f'},exam:{g:'f',rate:1.06},grandson:{g:'m',rate:1.1},intercom:{g:'m'},courier:{g:'f',rate:1.04},boss:{g:'m'},honest_bank:{g:'f'},honest_delivery:{g:'m',rate:1.04},boss_voice:{g:'m',rate:1.07},daughter_voice:{g:'f',rate:1.05}});
+function guessG(who){who=String(who||'');const w=who.trim().split(/\s+/)[0]||'';return /(овна|евна|ична)(?![а-яё])/i.test(who)||/^(мама|мам|бабушка|дочь|сестра|катя|аня|лена|оля|маша|таня|наташа|алина|елена|татьяна|подруга)/i.test(w)?'f':'m';}
+function voiceOf(sc){const p=sc&&own(VOICE_P,sc.id)?VOICE_P[sc.id]:{};return{g:p.g||guessG(sc&&sc.who),rate:p.rate||1,pitch:1};}
+const DIGIT_W=dict({'ноль':0,'нуль':0,'один':1,'одна':1,'раз':1,'два':2,'две':2,'три':3,'четыре':4,'пять':5,'шесть':6,'семь':7,'восемь':8,'девять':9});
+function digitsOf(t){return String(t||'').toLowerCase().split(/[^0-9а-яё]+/).map(w=>/^\d+$/.test(w)?w:own(DIGIT_W,w)?String(DIGIT_W[w]):'').join('');}
 
 const VC={listening:false};
 const hfOn=()=>!!(S.handsFree&&STT.agreed&&STT.ok());
@@ -66,7 +66,7 @@ function openVoiceSettings(){TTS.load();const L=TTS.list,body=el('div',{class:'s
     body.append(el('label',{},el('span',{class:'row',style:'justify-content:space-between'},'Скорость речи',rv),rate));
     body.append(el('p',{class:'small muted',text:(TTS.good()?'Голоса с пометкой «естественный» звучат ближе всего к живой речи. ':'Естественных голосов в этом браузере нет — доступны только упрощённые. ')+VOICE_HINT}));}
   body.append(el('div',{class:'lim'},el('b',{class:'small',text:'Ответ голосом'}),el('span',{class:'small',text:STT.ok()?'В звонке нажмите микрофон рядом с полем ответа. Или включите «Голосом» внизу экрана — тогда микрофон будет включаться сам после каждой реплики собеседника, как в настоящем разговоре.':'Этот браузер не распознаёт речь. Голосом можно отвечать в Chrome, Edge и Safari.'})));
-  body.append(el('p',{class:'tiny faint',text:(hasClips()?'Нейросетевые голоса: Silero TTS (silero.ai), лицензия CC BY-NC 4.0 — для учебного некоммерческого использования. ':'')+'Голос браузера зависит от устройства. Настройки сохраняются только в этом браузере.'}));
+  body.append(el('p',{class:'tiny faint',text:(hasClips()?'Нейросетевые голоса: Silero TTS (silero.ai), модель v5_6_ru, лицензия CC BY-NC-SA 4.0 — только некоммерческое использование с указанием авторства. ':'')+'Голос браузера зависит от устройства. Настройки сохраняются только в этом браузере.'}));
   modal('Голоса и микрофон',body,{onClose:()=>hush()});}
 
 /* --- Нейросетевые голоса Silero: реплики сценариев озвучены заранее и лежат рядом со страницей --- */
@@ -78,13 +78,16 @@ function vKey(spk,text){const s=spk+'|'+speechParts(text).join(' ');let h=0x811c
 const hasClips=()=>typeof VOICE_FILES==='object'&&Object.keys(VOICE_FILES).length>0;
 function useRecorded(sim){return !!(sim&&sim.mode==='call'&&hasClips()&&S.voice&&S.callVoice!=='ai');}
 const CLIP={q:[],cur:null,gen:0,broken:false};
-function clipStop(){CLIP.gen++;CLIP.q=[];if(CLIP.cur){try{CLIP.cur.pause();}catch(e){}CLIP.cur=null;}}
+/* остановка: очередь и счётчик ожидающих реплик очищаются, обработчики старых клипов больше не срабатывают */
+function clipStop(){CLIP.gen++;const n=CLIP.q.length+(CLIP.cur?1:0);CLIP.q=[];TTS.pending=Math.max(0,TTS.pending-n);
+  if(CLIP.cur){const a=CLIP.cur;CLIP.cur=null;a.onended=a.onerror=null;try{a.pause();a.removeAttribute('src');a.load();}catch(e){}}}
 function clipNext(){if(CLIP.cur||!CLIP.q.length)return;const it=CLIP.q.shift(),gen=CLIP.gen,a=new Audio('v/'+it.k+'.mp3');CLIP.cur=a;a.preload='auto';
-  const done=ok=>{if(gen!==CLIP.gen)return;CLIP.cur=null;if(!ok){CLIP.broken=true;speak(it.text,it.o);}TTS.pending=Math.max(0,TTS.pending-1);if(!TTS.pending)TTS.idle();clipNext();};
+  let fired=false;/* onerror и отказ play() могут прийти оба — обрабатываем только первое событие */
+  const done=ok=>{if(fired||gen!==CLIP.gen)return;fired=true;a.onended=a.onerror=null;CLIP.cur=null;if(!ok){CLIP.broken=true;speak(it.text,it.o);}TTS.pending=Math.max(0,TTS.pending-1);if(!TTS.pending)TTS.idle();clipNext();};
   a.onended=()=>done(true);a.onerror=()=>done(false);a.play().catch(()=>done(false));}
 /* единая точка: заранее озвученный клип, а если его нет — голос браузера */
 function say(text,sc){const o=voiceOf(sc);if(!S.voice)return false;const k=vKey(spkOf(sc),text);
   const want=SIM&&SIM.mode==='chat'?true:useRecorded(SIM);
-  if(want&&hasClips()&&VOICE_FILES[k]&&!CLIP.broken){TTS.pending++;CLIP.q.push({k,text,o});clipNext();return true;}
+  if(want&&hasClips()&&own(VOICE_FILES,k)&&!CLIP.broken){TTS.pending++;CLIP.q.push({k,text,o});clipNext();return true;}
   return speak(text,o);}
 const VOICE_SAMPLE={baya:'Здравствуйте! Меня зовут Бая. Не волнуйтесь, я помогу вам во всём разобраться.',kseniya:'Добрый день! Меня зовут Ксения. Уделите мне, пожалуйста, одну минуту.',xenia:'Привет! Я Ксюша. Это займёт буквально пару секунд, честное слово.',aidar:'Добрый день. Меня зовут Айдар. Слушайте внимательно, времени у нас мало.',eugene:'Здравствуйте! Меня зовут Евгений. Я вас долго не задержу.'};

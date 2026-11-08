@@ -286,5 +286,6 @@ SCHEMES.forEach(s=>s.c=SCHEME_CAT[s.id]||s.c);
 const CAT_KEYS=Object.keys(CATS);
 const ITEM_BY={};ITEMS.forEach(i=>ITEM_BY[i.id]=i);
 const SITE_BY={};SITES.forEach(s=>SITE_BY[s.id]=s);
-function scenarioById(k,id){return k==='call'?CALLS.find(s=>s.id===id):k==='chat'?CHATS.find(s=>s.id===id):k==='site'?SITE_BY[id]:k==='card'?CARDS.find(c=>c.id===id):k==='item'?ITEM_BY[id]:null;}
+[AUDS,CATS,SKILLS,MARKERS,ITEM_BY,SITE_BY,SRC,CAT_OF,SCHEME_CAT,SC_EXTRA,LVL,RES_T,KIND_T].forEach(o=>{if(o&&typeof o==='object')dict(o);});
+function scenarioById(k,id){if(typeof id!=='string')return null;return k==='call'?CALLS.find(s=>s.id===id):k==='chat'?CHATS.find(s=>s.id===id):k==='site'?(own(SITE_BY,id)?SITE_BY[id]:null):k==='card'?CARDS.find(c=>c.id===id):k==='item'?(own(ITEM_BY,id)?ITEM_BY[id]:null):null;}
 function titleOf(k,id){const x=scenarioById(k,id);return x?(x.t||x.f||id):id;}

@@ -1,4 +1,4 @@
-const {chromium}=require('playwright');
+const {launch,args}=require('./browser.js');
 const fs=require('fs');
 const path=require('path');const SP=path.resolve(__dirname,'..');
 const out=SP+'/tests/out/';fs.mkdirSync(out,{recursive:true});
@@ -17,7 +17,7 @@ fs.writeFileSync(out+'mock.html',wrap(MOCK));
 const V1={aud:'student',large:false,coach:true,voice:true,tab:'check',prot:{selfban:true},hist:[{m:'call',id:'bank_safe',res:'bad',ts:Date.now()-86400000*3},{m:'chat',id:'job_drop',res:'ok',ts:Date.now()-86400000*2},{m:'swipe',id:'swipe',res:'ok',ts:Date.now()}]};
 fs.writeFileSync(out+'v1.html',wrap('<script>try{localStorage.setItem("immunitet.v1",'+JSON.stringify(JSON.stringify(V1))+')}catch(e){}</script>'));
 (async()=>{
-  const b=await chromium.launch();const errs=[],log=(...a)=>console.log(...a);
+  const b=await launch();const errs=[],log=(...a)=>console.log(...a);
   async function mkPage(opts,file){const ctx=await b.newContext(opts);const p=await ctx.newPage();
     p.on('pageerror',e=>errs.push(file+': '+e.message));
     p.on('console',m=>{if(m.type()==='error'&&!/fonts\.g|ERR_|net::/.test(m.text()))errs.push(file+' console: '+m.text());});
@@ -113,8 +113,8 @@ fs.writeFileSync(out+'v1.html',wrap('<script>try{localStorage.setItem("immunitet
   await p.click('#ckKind button[data-k="url"]');await p.fill('#ckUrl','http://gosuslugi-vhod.lk-oplata.top/login');await p.waitForTimeout(400);
   const lu=await p.textContent('#ckLocal');log('url rules:',lu.slice(0,160));need(/Слова-приманки/.test(lu)&&/не открывал/.test(lu),'url rules');
   await objc(p,'url');await p.screenshot({path:out+'d_check_url.png',fullPage:true});
-  await p.fill('#ckUrl','госуслуги.рф');await p.waitForTimeout(350);need(!/вперемешку/.test(await p.textContent('#ckLocal')),'cyrillic domain flagged as mixed');
-  await p.fill('#ckUrl','gоsuslugi.ru');await p.waitForTimeout(350);need(/вперемешку/.test(await p.textContent('#ckLocal')),'homoglyph not flagged');
+  await p.fill('#ckUrl','госуслуги.рф');await p.waitForTimeout(350);need(!/разных алфавитов/.test(await p.textContent('#ckLocal')),'cyrillic domain flagged as mixed');
+  await p.fill('#ckUrl','gоsuslugi.ru');await p.waitForTimeout(350);need(/разных алфавитов/.test(await p.textContent('#ckLocal')),'homoglyph not flagged');
   // письмо
   await p.click('#ckEx button:has-text("Письмо")');await p.waitForTimeout(350);
   const lm=await p.textContent('#ckLocal');log('mail rules:',lm.slice(0,160));need(/бесплатной почты/.test(lm)&&/вложение/i.test(lm),'mail rules');
@@ -141,7 +141,7 @@ fs.writeFileSync(out+'v1.html',wrap('<script>try{localStorage.setItem("immunitet
   // защита и организации
   await tab(p,'protect');await p.click('.prot .sw >> nth=0');await p.waitForTimeout(100);log('prot:',await p.textContent('#protScore'));
   await tab(p,'org');for(const k of ['dash','score','api','widget']){await p.click('#orgSeg button[data-o="'+k+'"]');await p.waitForTimeout(300);
-    if(k==='api'){await p.click('#org-api .btn.primary');await p.waitForTimeout(200);const r=await p.textContent('#apiOut');need(/"risk"/.test(r),'api out');}}
+    if(k==='api'){await p.click('#org-api .btn.primary');await p.waitForTimeout(200);const r=await p.textContent('#apiOut');need(/"demo_risk_score"|"risk_level"/.test(r)&&!/NaN|Infinity/.test(r),'api out: '+r.slice(0,80));}}
   // персистентность
   await p.reload();await p.waitForTimeout(400);
   const per=await p.evaluate(()=>({tab:S.tab,att:S.attempts.length,tests:S.tests.length}));log('after reload:',JSON.stringify(per));need(per.tests===2,'tests not persisted');
@@ -165,7 +165,7 @@ fs.writeFileSync(out+'v1.html',wrap('<script>try{localStorage.setItem("immunitet
   need(!/912 345|5678 9012|4821/.test(m2),'PII not masked in consent');
   await p.click('.modal .btn.primary');await p.waitForTimeout(500);
   const sent=await p.evaluate(()=>String(window.__calls[0].input));need(!/912 345|5678 9012|4821/.test(sent),'PII leaked to model');
-  const ai=await p.textContent('#ckAI');need(/Критический риск/.test(ai)&&/86%/.test(ai)&&/Ограничения анализа/.test(ai),'AI check render: '+ai.slice(0,120));
+  const ai=await p.textContent('#ckAI');need(/Критический риск/.test(ai)&&/как высокую/.test(ai)&&!/86\s?%/.test(ai)&&/не откалибр/.test(ai)&&/Ограничения анализа/.test(ai),'AI check render: '+ai.slice(0,160));
   need(!/этой фразы нет/.test(ai),'fabricated quote not dropped');need(/Hi-Tech Mail/.test(ai),'source not rendered');
   log('AI check text:',ai.slice(0,260));
   // ответ не по схеме -> недостаточно данных
@@ -183,20 +183,25 @@ fs.writeFileSync(out+'v1.html',wrap('<script>try{localStorage.setItem("immunitet
   // звонок с ИИ + разбор
   await p.evaluate(()=>{S.callVoice='ai';openSim('call','gos_hack');});await p.waitForTimeout(250);
   await p.click('button[aria-label="Ответить"]');await p.waitForTimeout(900);
-  await p.fill('#phIn','А кто вы такой?');await p.press('#phIn','Enter');await p.waitForTimeout(900);
+  await p.fill('#phIn','А кто вы такой?');await p.press('#phIn','Enter');await p.waitForTimeout(400);
+  need(/тренировка с ИИ-собеседником/.test(await p.textContent('.modal').catch(()=>'')),'AI sim consent missing');
+  need(/А кто вы такой/.test(await p.textContent('.modal').catch(()=>'')),'AI sim consent does not show transcript');
+  await p.click('.modal .btn.primary');await p.waitForTimeout(900);
   need(await p.$('.sms'),'AI-mode SMS not shown');
   await p.click('.minibtn.danger');await p.waitForTimeout(300);
-  await p.click('#aiDeb').catch(()=>errs.push('no AI debrief btn'));await p.waitForTimeout(600);
+  await p.click('#aiDeb').catch(()=>errs.push('no AI debrief btn'));await p.waitForTimeout(250);
+  need(/разбор тренировки/.test(await p.textContent('.modal').catch(()=>'')),'debrief consent missing');await p.click('.modal .btn.primary').catch(()=>{});await p.waitForTimeout(600);
   need(/Тестовый разбор/.test(await p.textContent('#aiDebBox').catch(()=>'')),'AI debrief missing');
   // ошибки + закономерности
   await p.evaluate(()=>Evidence.record({k:'call',id:'bank_safe',sk:'codes',lvl:1,res:'bad',s:0,mk:['code']}));await tab(p,'mentor');await p.click('#mSeg button[data-t="mist"]');await p.waitForTimeout(150);
-  await p.click('#m-mist .btn.primary:has-text("Найти")').catch(()=>errs.push('no patterns btn'));await p.waitForTimeout(500);
+  await p.click('#m-mist .btn.primary:has-text("Найти")').catch(()=>errs.push('no patterns btn'));await p.waitForTimeout(250);
+  need(/Профиль навыков|навык/i.test(await p.textContent('.modal').catch(()=>'')),'mistakes consent does not list skill profile');await p.click('.modal .btn.primary').catch(()=>{});await p.waitForTimeout(500);
   log('patterns:',(await p.textContent('#m-mist')).includes('Тест закономерностей'));
   // загрузка отчёта/экспорта через downloads
   await tab(p,'progress');await p.click('#progBody .btn:has-text("Экспорт")');await p.waitForTimeout(300);log('downloads:',await p.evaluate(()=>window.__dl));
   // API организаций с ИИ
   await tab(p,'org');await p.click('#orgSeg button[data-o="api"]');await p.waitForTimeout(200);
-  await p.click('#org-api .sw');await p.click('#org-api .btn.primary');await p.waitForTimeout(300);if(await p.$('.modal'))await p.click('.modal .btn.primary');await p.waitForTimeout(600);log('api engine:',((await p.textContent('#apiOut')).match(/"engine":\s*"[^"]*"/)||[])[0]);
+  await p.click('#org-api .sw');await p.click('#org-api .btn.primary');await p.waitForTimeout(300);if(await p.$('.modal'))await p.click('.modal .btn.primary');await p.waitForTimeout(600);{const ao=await p.textContent('#apiOut');log('api engine:',(ao.match(/"engine":\s*"[^"]*"/)||[])[0]);need(/rules-v2\+llm/.test(ao)&&/"risk_level"/.test(ao),'api with AI: '+ao.slice(0,120));}
   await p.context().close();
 
   /* ===== MOBILE 400 light/dark ===== */
