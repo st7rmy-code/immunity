@@ -1,0 +1,7 @@
+node_modules/
+dist/
+tests/out/
+tools/voicegen/*.pt
+tools/voicegen/page.html
+.env
+.DS_Store

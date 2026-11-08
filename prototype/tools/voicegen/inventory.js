@@ -1,0 +1,20 @@
+const {chromium}=require('playwright');const fs=require('fs');const path=require('path');const {execFileSync}=require('child_process');
+const ROOT=path.resolve(__dirname,'..','..'),SP=__dirname;
+execFileSync(process.execPath,[path.join(ROOT,'build.mjs'),'artifact'],{stdio:'inherit'});
+fs.writeFileSync(SP+'/page.html','<!doctype html><html lang="ru"><head><meta charset="utf-8"></head><body>'+fs.readFileSync(path.join(ROOT,'dist','artifact.html'),'utf8')+'</body></html>');
+(async()=>{const b=await chromium.launch();const p=await b.newPage();await p.goto('file://'+SP+'/page.html');await p.waitForTimeout(400);
+const inv=await p.evaluate(()=>{const out=new Map();
+  const add=(sc,text,spk)=>{if(typeof text!=='string'||!text.trim())return;if(!spk&&sc&&voiceOf(sc).g==='f'){FEM.forEach(f=>add(sc,text,f));return;}spk=spk||spkOf(sc);const t=speechParts(text).join(' ');if(!t)return;const k=vKey(spk,text);if(!out.has(k))out.set(k,{k,spk,text:t,sc:sc?sc.id:'sample'});};
+  CALLS.forEach(sc=>{add(sc,sc.open);(sc.script||[]).forEach(x=>add(sc,typeof x==='string'?x:x.say));(sc.push||[]).forEach(x=>add(sc,x));add(sc,sc.idAns);add(sc,sc.giveup);
+    if(sc.honest){GEN.honest.forEach(x=>add(sc,x));add(sc,'Если останутся вопросы — звоните по официальному номеру. Всего доброго!');add(sc,'Всего доброго!');add(sc,'Стоп! Никогда не называйте коды и данные карты — даже сотрудникам банка. Я у вас ничего не спрашиваю.');}
+    else{GEN.call.push.forEach(x=>add(sc,x));add(sc,voiceOf(sc).g==='f'?GEN.call.idF:GEN.call.id);add(sc,GEN.call.giveup);Object.values(LAST_T).forEach(x=>add(sc,x));}});
+  const VRE=/^🎤\s*(?:Голосовое\s*)?(\d+:\d+)?\s*[—-]?\s*«?([\s\S]*?)»?\s*$/;
+  CHATS.forEach(sc=>{const ls=[];(Array.isArray(sc.open)?sc.open:[]).forEach(m=>ls.push(m.say));(sc.script||[]).forEach(x=>ls.push(typeof x==='string'?x:x.say));(sc.push||[]).forEach(x=>ls.push(x));
+    ls.forEach(t=>{if(typeof t==='string'&&t.startsWith('🎤')){const m=t.match(VRE);if(m&&m[2])add(sc,m[2]);}});});
+  Object.keys(SPK_T).forEach(s=>add(null,VOICE_SAMPLE[s],s));
+  return [...out.values()];});
+fs.writeFileSync(SP+'/lines.json',JSON.stringify(inv,null,1));
+const by={};inv.forEach(x=>by[x.spk]=(by[x.spk]||0)+1);
+console.log('lines',inv.length,'chars',inv.reduce((a,x)=>a+x.text.length,0),JSON.stringify(by));
+console.log('with digits:',inv.filter(x=>/\d/.test(x.text)).map(x=>x.text.match(/.{0,20}\d[\d\s:%.,]*.{0,12}/)[0]).join(' || '));
+await b.close();})();

@@ -1,0 +1,242 @@
+<header class="hdr">
+  <div class="hdr-in gutter">
+    <button class="logo" id="logoBtn" aria-label="Иммунитет: на главную">
+      <span class="mark" aria-hidden="true"></span>
+      <span><span class="wm">ИММУНИТЕТ</span><span class="sub">тренажёр финансовой безопасности</span></span>
+    </button>
+    <nav class="tabs" role="tablist" aria-label="Разделы">
+      <button role="tab" data-tab="home" aria-selected="true">Главная</button>
+      <button role="tab" data-tab="train" aria-selected="false">Тренировки</button>
+      <button role="tab" data-tab="progress" aria-selected="false">Прогресс</button>
+      <button role="tab" data-tab="mentor" aria-selected="false">Наставник</button>
+      <button role="tab" data-tab="schemes" aria-selected="false">Схемы 2026</button>
+      <button role="tab" data-tab="protect" aria-selected="false">Защита</button>
+      <button role="tab" data-tab="org" aria-selected="false">Организациям</button>
+    </nav>
+    <div class="tools">
+      <button class="chip" id="largeBtn" aria-pressed="false" title="Крупный шрифт" aria-label="Крупный шрифт">Aa</button>
+      <button class="chip" id="idxChip" title="Ваш индекс иммунитета"><span class="lbl">Иммунитет</span> <b id="idxChipV">—</b></button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap gutter">
+
+<!-- ГЛАВНАЯ -->
+<section class="tab" id="tab-home">
+  <div class="hero">
+    <div class="stack" style="gap:18px">
+      <span class="eyebrow">Тренажёр финансовой безопасности</span>
+      <h1>Мошенники репетируют каждый день. Теперь можно и вам</h1>
+      <p class="lead">Звонки «из банка» и «финразведки», голос внука, подделанный нейросетью, вербовка в дропы, фальшивые рабочие чаты и штрафы. Тренируйтесь на безопасных симуляциях с ИИ, а не на своих деньгах.</p>
+      <div class="stack" style="gap:8px">
+        <span class="small muted">Кто вы? Подберём сценарии и размер шрифта</span>
+        <div class="auds" id="auds"></div>
+      </div>
+      <div class="row">
+        <button class="btn primary" id="heroCall">Принять тренировочный звонок</button>
+        <button class="btn" id="heroCheck">Проверить сообщение</button>
+        <button class="btn urgent" id="heroEm">Меня обманывают сейчас</button>
+      </div>
+    </div>
+    <div class="card flat" id="idxCard"></div>
+  </div>
+
+  <div class="card emcard" id="emCard">
+    <div class="ph">
+      <div class="stack" style="gap:4px"><span class="eyebrow" style="color:var(--bad)">Экстренный режим</span><h2>Меня пытаются обмануть прямо сейчас</h2></div>
+      <span class="tag bad">не тренировка</span>
+    </div>
+    <p class="small muted">Выберите ситуацию — покажем, что сделать в ближайшие минуты. Если деньги уже ушли, начните с последней кнопки.</p>
+    <div class="emgrid" id="emergencyGrid"></div>
+  </div>
+
+  <div class="card">
+    <div class="ph"><h2>Следующий шаг</h2><span class="small muted" id="nextFor"></span></div>
+    <div class="scens" id="nextList"></div>
+  </div>
+
+  <div class="card">
+    <div class="ph"><h2>Цифры 2025–2026</h2><span class="small faint">по открытым данным ЦБ, Росфинмониторинга и аналитиков</span></div>
+    <div class="facts" id="facts"></div>
+  </div>
+
+  <div class="g3">
+    <div class="card"><span class="eyebrow">1 · Тренировка</span><h3>Проживите обман без потерь</h3><p class="muted small">ИИ играет мошенника: звонит, торопит, давит, присылает «код». Вы учитесь вовремя положить трубку.</p></div>
+    <div class="card"><span class="eyebrow">2 · Разбор</span><h3>Поймите, на чём вас ловили</h3><p class="muted small">После каждой тренировки — красные флаги, правильный ход и факты с источниками. Диагностика до и после показывает, что изменилось.</p></div>
+    <div class="card"><span class="eyebrow">3 · Защита</span><h3>Закройте уязвимости заранее</h3><p class="muted small">Самозапрет на кредиты, «вторая рука», кодовое слово семьи — пошагово и с отметками.</p></div>
+  </div>
+
+  <div class="card flat">
+    <div class="ph">
+      <div class="stack" style="gap:4px"><span class="eyebrow">Для банков, МФО, школ, вузов и работодателей</span><h2>Тот же движок — для вашей организации</h2></div>
+      <button class="btn ink" id="toOrg">Открыть раздел</button>
+    </div>
+    <p class="muted small">Обезличенная аналитика уязвимостей, объяснимые антифрод-модели («кредит под диктовку», дроп-счета, МСП-контрагенты), API проверки сообщений и виджет для вашего приложения.</p>
+  </div>
+
+  <p class="foot">Учебный проект. Не является официальным ресурсом государственных органов, Банка России или банков. Имена, номера телефонов и сайты в сценариях вымышлены; названия ведомств используются только как пример того, кем представляются мошенники. Тренажёр не запрашивает и не хранит настоящие коды, номера карт и паспортные данные.</p>
+</section>
+
+<!-- ТРЕНИРОВКИ -->
+<section class="tab" id="tab-train" hidden>
+  <div class="ph">
+    <div class="seg" id="trSeg" role="group" aria-label="Тип тренировки">
+      <button data-m="call" aria-pressed="true">Звонок</button>
+      <button data-m="chat" aria-pressed="false">Переписка</button>
+      <button data-m="site" aria-pressed="false">Сайты</button>
+      <button data-m="swipe" aria-pressed="false">Верю — не верю</button>
+    </div>
+    <span class="small muted" id="aiStatus">Подключаю ИИ…</span>
+  </div>
+
+  <div id="simPick" class="stack" style="gap:14px">
+    <div class="ph">
+      <div class="row" id="audFilter"></div>
+      <span class="small muted" id="pickNote"></span>
+    </div>
+    <div class="scens" id="scenList"></div>
+  </div>
+
+  <div id="simStage" class="stack" style="gap:14px" hidden>
+    <div class="ph">
+      <button class="btn sm ghost" id="backPick">← Все сценарии</button>
+      <div class="row">
+        <button class="chip" id="coachBtn" aria-pressed="true">Подсказки тренера</button>
+        <button class="chip" id="voiceBtn" aria-pressed="true">Звук и голос</button>
+        <button class="chip" id="voiceSet">Голоса и микрофон</button>
+      </div>
+    </div>
+    <div class="stagegrid">
+      <div class="phone" id="phone" aria-label="Экран тренировочного телефона"></div>
+      <div class="stack" id="simSide" style="gap:14px"></div>
+    </div>
+  </div>
+
+  <div id="swipeBox" class="swwrap" hidden></div>
+</section>
+
+<!-- НАСТАВНИК -->
+<section class="tab" id="tab-mentor" hidden>
+  <div class="ph">
+    <div class="stack" style="gap:4px"><h2>ИИ-наставник</h2><p class="small muted" id="mStatus">Подключаю ИИ…</p></div>
+    <div class="seg" id="mSeg" role="group" aria-label="Режим наставника">
+      <button data-t="check" aria-pressed="true">Проверить</button>
+      <button data-t="ask" aria-pressed="false">Спросить</button>
+      <button data-t="mist" aria-pressed="false">Мои ошибки</button>
+      <button data-t="gloss" aria-pressed="false">Словарь</button>
+    </div>
+  </div>
+
+  <div id="m-check" class="stack" style="gap:18px">
+  <div class="split">
+    <div class="card">
+      <div class="ph"><h2>AI-детектив: проверить</h2><span class="small faint">ничего не сохраняется</span></div>
+      <div class="seg" id="ckKind" role="group" aria-label="Что проверяем">
+        <button data-k="msg" aria-pressed="true">Сообщение или звонок</button>
+        <button data-k="url" aria-pressed="false">Ссылка</button>
+        <button data-k="mail" aria-pressed="false">Письмо</button>
+      </div>
+      <p class="small muted" id="ckHelp">Вставьте текст СМС, переписки или перескажите звонок. Можно добавить скриншот. Сначала текст проверят правила прямо в браузере; ИИ получит его только после вашего согласия, с замаскированными личными данными.</p>
+      <label id="ckUrlRow" hidden>Адрес ссылки<input id="ckUrl" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="например: gosportal-vhod.site/login"></label>
+      <div id="ckMailRow" class="g2" hidden>
+        <label>Отправитель<input id="ckFrom" type="text" autocomplete="off" spellcheck="false" placeholder="Банк &lt;info@bank-secure.top&gt;"></label>
+        <label>Тема письма<input id="ckSubj" type="text" autocomplete="off" placeholder="Ваш счёт будет заблокирован"></label>
+      </div>
+      <label id="ckTextLbl" class="sr-label" for="ckText">Текст для проверки</label>
+      <textarea id="ckText" rows="9" maxlength="12000" aria-describedby="ckCount"></textarea>
+      <div class="row" style="justify-content:space-between"><span class="tiny faint" id="ckCount" aria-live="polite">0 / 10 000</span><span class="tiny faint">до 2 скриншотов по 10 МБ</span></div>
+      <div class="row">
+        <button class="btn primary" id="ckGo">Спросить мнение ИИ</button>
+        <button class="btn" id="ckAddImg">Добавить скриншот</button>
+        <input type="file" id="ckFile" accept="image/*" multiple hidden>
+      </div>
+      <div class="thumbs" id="ckThumbs"></div>
+      <div class="stack" style="gap:6px"><span class="small muted">Примеры</span><div class="row" id="ckEx"></div></div>
+    </div>
+    <div class="card" id="ckLocal" aria-live="polite"></div>
+  </div>
+  <div class="card" id="ckAI" hidden aria-live="polite"></div>
+  <div class="card flat">
+    <div class="ph"><h2>Уже сообщили код или перевели деньги?</h2><button class="btn sm" id="toEmergency">Что делать — по шагам</button></div>
+    <p class="small muted">Действуйте быстро: чем раньше вы позвоните в банк, тем больше шансов остановить перевод.</p>
+  </div>
+  </div>
+
+  <div id="m-ask" class="stack" style="gap:14px" hidden>
+    <div class="card">
+      <div class="ph"><h2>Спросить наставника</h2><span class="small faint">учитывает ваши слабые навыки</span></div>
+      <div id="askLog" class="asklog" aria-live="polite"></div>
+      <form id="askForm" class="askform">
+        <input id="askIn" type="text" autocomplete="off" placeholder="Например: можно ли называть код из СМС курьеру?" aria-label="Вопрос наставнику">
+        <button class="btn primary" id="askGo" type="submit">Спросить</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="m-mist" class="stack" style="gap:14px" hidden></div>
+
+  <div id="m-gloss" class="stack" style="gap:14px" hidden>
+    <div class="ph">
+      <div class="stack" style="gap:4px"><h2>Словарь</h2><p class="small muted">Термины, которыми пользуются мошенники и банки, — простыми словами</p></div>
+      <input id="glQ" type="search" placeholder="Поиск: дроп, Госуслуги…" style="max-width:300px" aria-label="Поиск по словарю">
+    </div>
+    <div class="glist" id="glList"></div>
+  </div>
+</section>
+
+<!-- ПРОГРЕСС -->
+<section class="tab" id="tab-progress" hidden>
+  <div id="progBody" class="stack" style="gap:18px"></div>
+</section>
+
+<!-- СХЕМЫ -->
+<section class="tab" id="tab-schemes" hidden>
+  <div class="ph">
+    <div class="stack" style="gap:4px"><h2>Схемы 2026 года</h2><p class="small muted">Что сейчас используют мошенники: по сообщениям МВД, Банка России, Росфинмониторинга и аналитиков кибербезопасности</p></div>
+    <input id="schQ" type="search" placeholder="Поиск: код, курьер, пенсия…" style="max-width:300px" aria-label="Поиск по схемам">
+  </div>
+  <div class="row" id="schCats"></div>
+  <div class="schemes" id="schList"></div>
+  <p class="foot">Под каждой схемой — источник и дата публикации. Описания пересказаны своими словами; фразы мошенников — типовые примеры.</p>
+</section>
+
+<!-- ЗАЩИТА -->
+<section class="tab" id="tab-protect" hidden>
+  <div class="ph">
+    <div class="stack" style="gap:4px"><h2>Защита за один вечер</h2><p class="small muted">Отмечайте сделанное — это самоотчёт, в индекс навыков он не входит</p></div>
+    <span class="tag acc" id="protScore"></span>
+  </div>
+  <div class="g2" id="protList"></div>
+  <div class="card">
+    <div class="ph"><h2>Как вас уже защищает закон</h2><span class="small faint">меры 2025–2026 годов</span></div>
+    <div class="g3" id="lawList"></div>
+  </div>
+  <div class="card" id="emergency">
+    <div class="ph"><h2>Если вы уже попались</h2><span class="tag bad">действовать сразу</span></div>
+    <ol class="steps" id="emSteps"></ol>
+    <p class="small muted" id="emNote"></p>
+  </div>
+</section>
+
+<!-- ОРГАНИЗАЦИЯМ -->
+<section class="tab" id="tab-org" hidden>
+  <div class="ph">
+    <div class="stack" style="gap:4px"><h2>Для организаций</h2><p class="small muted">Обучение людей и антифрод — на одном движке. Все цифры в разделе демонстрационные.</p></div>
+    <div class="seg" id="orgSeg" role="group" aria-label="Раздел для организаций">
+      <button data-o="value" aria-pressed="true">Ценность</button>
+      <button data-o="dash" aria-pressed="false">Аналитика</button>
+      <button data-o="score" aria-pressed="false">Скоринг</button>
+      <button data-o="api" aria-pressed="false">API</button>
+      <button data-o="widget" aria-pressed="false">Виджет</button>
+    </div>
+  </div>
+  <div id="org-value" class="stack" style="gap:18px"></div>
+  <div id="org-dash" class="stack" style="gap:18px" hidden></div>
+  <div id="org-score" class="stack" style="gap:18px" hidden></div>
+  <div id="org-api" class="stack" style="gap:18px" hidden></div>
+  <div id="org-widget" class="stack" style="gap:18px" hidden></div>
+</section>
+
+</main>
+<div id="tipLayer"></div>
