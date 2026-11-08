@@ -129,6 +129,7 @@ const add = (rows, file) => rows.forEach(r => R.push(Object.assign({ file }, r))
     t('URL', 'IPv6', () => has(urlRules('http://[2001:db8::1]/login'), 'url_ip'));
     t('URL', 'нестандартный порт', () => has(urlRules('https://bank.ru:8443/login'), 'url_port') && !has(urlRules('https://bank.ru:443/login'), 'url_port'));
     t('URL', 'кириллический домен не считается смешанным', () => { const h = urlRules('https://госуслуги.рф/'); return !has(h, 'url_mix') && !has(h, 'url_confusable') || h.map(x => x.id).join(); });
+    t('URL', 'кириллический домен без признаков вообще (xn-- не «длинный адрес»)', () => { const r = url('https://госуслуги.рф/'); return r.detected_indicators.length === 0 && lvl(r) === 'unknown' || r.detected_indicators.map(h => h.id).join(); });
     t('URL', 'смешанные алфавиты (IDN-подделка) → сильный', () => tierOf(urlRules('https://gоsuslugi.ru/'), 'url_mix') === 'strong');
     t('URL', 'IDN в punycode тоже распознаётся', () => { const pc = new URL('https://gоsuslugi.ru/').hostname; const h = urlRules('https://' + pc + '/'); return pc.startsWith('xn--') && has(h, 'url_mix') || pc + ' ' + h.map(x => x.id); });
     t('URL', 'сокращённая ссылка — слабый признак, не выше низкого', () => { const r = url('https://clck.ru/3AbCd'); return has(r.detected_indicators, 'url_short') && tierOf(r.detected_indicators, 'url_short') === 'weak' && lvl(r) === 'low' || lvl(r); });

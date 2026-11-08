@@ -1,0 +1,43 @@
+# Полный стек: PostgreSQL + API + веб-интерфейс (nginx раздаёт сборку React и озвучку, проксирует /api).
+#   cp infrastructure/.env.example infrastructure/.env   # задайте пароль БД и секрет JWT
+#   docker compose -f infrastructure/docker-compose.yml --env-file infrastructure/.env up --build
+#   → http://localhost:8080
+name: immunity
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: immunity
+      POSTGRES_USER: immunity
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?задайте POSTGRES_PASSWORD в infrastructure/.env}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U immunity -d immunity"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  backend:
+    build: ../backend
+    environment:
+      IMMUNITY_ENV: ${IMMUNITY_ENV:-prod}
+      IMMUNITY_DATABASE_URL: postgresql+psycopg://immunity:${POSTGRES_PASSWORD}@db:5432/immunity
+      IMMUNITY_JWT_SECRET: ${IMMUNITY_JWT_SECRET:?задайте IMMUNITY_JWT_SECRET (не короче 32 символов)}
+      IMMUNITY_COOKIE_SECURE: ${IMMUNITY_COOKIE_SECURE:-true}
+      IMMUNITY_AUDIO_BASE_URL: /audio/
+    depends_on:
+      db: {condition: service_healthy}
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: frontend/Dockerfile
+    ports: ["8080:80"]
+    depends_on:
+      backend: {condition: service_healthy}
+    restart: unless-stopped
+
+volumes:
+  pgdata:

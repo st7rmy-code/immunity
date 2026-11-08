@@ -66,7 +66,7 @@ function urlRules(raw){const hits=[];const P=parseUrl(raw);if(!P)return hits;con
     const risky=RISKY_TLD.test(host);if(risky)add('url_tld','weak','Зона, популярная у одноразовых сайтов','Такие домены дёшевы. Сама по себе зона — не доказательство.','.'+tld);
     const lure=[...new Set((host.match(LURE_RE)||[]).map(x=>x.toLowerCase()))];
     if(lure.length)add('url_lure','weak','Слова-приманки в адресе','«'+lure.slice(0,3).join('», «')+'» — так адрес делают похожим на банк, оплату или госуслуги. У настоящих сервисов они тоже бывают.',lure[0]);
-    const hy=(host.match(/-/g)||[]).length,deep=labels.length>=4;
+    const hy=(uhost.match(/-/g)||[]).length,deep=labels.length>=4;/* дефисы считаем в читаемом адресе: «xn--» у кириллических доменов — не признак */
     if(deep||hy>=2)add('url_long','weak','Длинный составной адрес','Много дефисов и поддоменов — частый приём поддельных сайтов.',host);
     if(lure.length&&(risky||hy>=2||deep))add('url_combo','strong','Приманка в одноразовом адресе','Слова «оплата», «вход», «госуслуги» в дешёвой зоне или в длинном составном адресе — типичный фишинг.',host);}
   if(u.port&&!['80','443'].includes(u.port))add('url_port','medium','Нестандартный порт','Обычные сайты не указывают порт в адресе.',':'+u.port);
