@@ -14,6 +14,6 @@
     "voices": "node tools/voicegen/inventory.js && python3 tools/voicegen/gen.py"
   },
   "devDependencies": {
-    "playwright": "1.63.0"
+    "playwright": "1.65.0"
   }
 }
