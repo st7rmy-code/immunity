@@ -30,7 +30,7 @@ jobs:
       IMMUNITY_TEST_DATABASE_URL: postgresql+psycopg://immunity:immunity_ci@localhost:5432/immunity_test
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
           cache: pip
@@ -62,7 +62,7 @@ jobs:
       IMMUNITY_COOKIE_SECURE: "false"
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
           cache: pip
