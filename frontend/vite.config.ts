@@ -32,7 +32,8 @@ export default defineConfig({
   plugins: [react(), tailwind(), staticFrom('/audio', join(PROTO, 'public', 'v')), staticFrom('/prototype', join(PROTO, 'dist'), 'index.html')],
   resolve: { alias: { '@': resolve(HERE, 'src') } },
   server: { port: 5173, proxy: { '/api': { target: API, changeOrigin: false } } },
-  preview: { port: 4173, proxy: { '/api': { target: API, changeOrigin: false } } },
+  // 127.0.0.1, а не localhost: на Linux и macOS localhost может слушать только IPv6, а e2e ходят по IPv4
+  preview: { host: '127.0.0.1', port: 4173, proxy: { '/api': { target: API, changeOrigin: false } } },
   build: {
     sourcemap: 'hidden', target: 'es2022', // карты кода для отладки, но браузер их не запрашивает
     // Библиотеки — отдельными файлами: они меняются редко и остаются в кэше браузера между выпусками.
