@@ -1,4 +1,5 @@
 # Раз в неделю — предложения обновить зависимости. Мелкие обновления группируются в один pull request.
+# Мажорные версии (Vite 8, TypeScript 7, React Router 8, Node 26…) ломают сборку — их обновляем вручную, отдельной задачей.
 version: 2
 updates:
   - package-ecosystem: pip
@@ -6,20 +7,25 @@ updates:
     schedule: {interval: weekly, day: monday}
     groups: {python: {update-types: [minor, patch]}}
     open-pull-requests-limit: 5
+    ignore: [{dependency-name: "*", update-types: ["version-update:semver-major"]}]
   - package-ecosystem: npm
     directory: /frontend
     schedule: {interval: weekly, day: monday}
     groups: {web: {update-types: [minor, patch]}}
     open-pull-requests-limit: 5
+    ignore: [{dependency-name: "*", update-types: ["version-update:semver-major"]}]
   - package-ecosystem: npm
     directory: /prototype
     schedule: {interval: monthly}
+    ignore: [{dependency-name: "*", update-types: ["version-update:semver-major"]}]
   - package-ecosystem: github-actions
     directory: /
     schedule: {interval: monthly}
   - package-ecosystem: docker
     directory: /backend
     schedule: {interval: monthly}
+    ignore: [{dependency-name: "*", update-types: ["version-update:semver-major"]}]
   - package-ecosystem: docker
     directory: /frontend
     schedule: {interval: monthly}
+    ignore: [{dependency-name: "*", update-types: ["version-update:semver-major"]}]
