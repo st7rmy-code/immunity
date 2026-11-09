@@ -1,12 +1,12 @@
 # Контекст сборки — корень репозитория (нужны prototype/ и озвучка).
-FROM node:22-alpine AS prototype
+FROM node:26-alpine AS prototype
 WORKDIR /p
 COPY prototype/build.mjs ./
 COPY prototype/src ./src
 COPY prototype/public ./public
 RUN node build.mjs
 
-FROM node:22-alpine AS web
+FROM node:26-alpine AS web
 WORKDIR /f
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --ignore-scripts --no-audit --no-fund
