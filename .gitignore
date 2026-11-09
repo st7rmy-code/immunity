@@ -11,3 +11,7 @@ frontend/test-results/
 frontend/playwright-report/
 .DS_Store
 *.tsbuildinfo
+
+# сборка Python-пакета
+build/
+*.egg-info/

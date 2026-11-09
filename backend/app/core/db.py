@@ -22,7 +22,8 @@ class Base(DeclarativeBase):
 
 @lru_cache
 def get_engine() -> Engine:
-    return create_engine(get_settings().database_url, pool_pre_ping=True, future=True)
+    s = get_settings()
+    return create_engine(s.database_url, pool_pre_ping=True, pool_size=s.db_pool_size, max_overflow=s.db_pool_size, pool_recycle=1800)
 
 
 @lru_cache

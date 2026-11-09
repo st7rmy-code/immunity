@@ -1,0 +1,15 @@
+# Одинаковые переводы строк на Mac, Linux и Windows
+* text=auto eol=lf
+*.command text eol=lf
+# Бинарные файлы: без diff и без перевода строк
+*.mp3 binary
+*.png binary
+*.pt  binary
+# Сгенерированное — свёрнуто в pull request и не считается в статистике языков
+frontend/package-lock.json   linguist-generated=true -diff
+prototype/package-lock.json  linguist-generated=true -diff
+frontend/src/shared/api/schema.d.ts linguist-generated=true
+docs/openapi.json            linguist-generated=true
+backend/app/seed/*.json      linguist-generated=true
+backend/tests/fixtures/*.json linguist-generated=true
+prototype/src/03c-voices.js  linguist-generated=true

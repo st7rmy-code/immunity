@@ -1,0 +1,29 @@
+name: Ошибка
+description: Что-то работает не так
+labels: [bug]
+body:
+  - type: dropdown
+    id: part
+    attributes:
+      label: Где
+      options: [Новый интерфейс (frontend), Сервер (backend), Прототип, Docker и запуск, Другое]
+    validations: {required: true}
+  - type: textarea
+    id: steps
+    attributes:
+      label: Как повторить
+      placeholder: "1. Открыть «Защита»\n2. Вставить ссылку …\n3. Нажать «Проверить»"
+    validations: {required: true}
+  - type: textarea
+    id: expected
+    attributes:
+      label: Что ожидалось и что получилось
+    validations: {required: true}
+  - type: input
+    id: env
+    attributes:
+      label: Браузер и система
+      placeholder: Safari 19, macOS 16
+  - type: markdown
+    attributes:
+      value: "Не прикладывайте настоящие номера карт, паспорта, пароли и коды — даже на скриншотах."

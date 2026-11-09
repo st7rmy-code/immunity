@@ -1,4 +1,4 @@
-import { Component, useEffect, useState, type ReactNode } from 'react';
+import { Component, lazy, Suspense, useEffect, useState, type ComponentType, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createBrowserRouter, Navigate, RouterProvider, useLocation, useRouteError } from 'react-router';
 import { ApiError } from '@/shared/api/client';
@@ -6,13 +6,18 @@ import { useMe } from '@/shared/api/hooks';
 import { applyPrefs, usePrefs } from '@/shared/stores';
 import { Button, ErrorState, Loading, Logo } from '@/shared/ui';
 import { Layout } from './Layout';
-import { Dashboard } from '@/pages/Dashboard';
-import { Learning } from '@/pages/Learning';
-import { CardsTrainer } from '@/pages/CardsTrainer';
-import { Protection } from '@/pages/Protection';
-import { Analytics } from '@/pages/Analytics';
-import { Profile } from '@/pages/Profile';
-import { Login, Register } from '@/pages/Auth';
+
+// Страницы грузятся по требованию: первый экран не тянет код остальных разделов.
+const page = <K extends string>(load: () => Promise<Record<K, ComponentType>>, name: K) =>
+  lazy(() => load().then((m) => ({ default: m[name] })));
+const Dashboard = page(() => import('@/pages/Dashboard'), 'Dashboard');
+const Learning = page(() => import('@/pages/Learning'), 'Learning');
+const CardsTrainer = page(() => import('@/pages/CardsTrainer'), 'CardsTrainer');
+const Protection = page(() => import('@/pages/Protection'), 'Protection');
+const Analytics = page(() => import('@/pages/Analytics'), 'Analytics');
+const Profile = page(() => import('@/pages/Profile'), 'Profile');
+const Login = page(() => import('@/pages/Auth'), 'Login');
+const Register = page(() => import('@/pages/Auth'), 'Register');
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -48,18 +53,19 @@ function Crash({ notFound }: { notFound?: boolean }) {
   );
 }
 
-const auth = (el: ReactNode) => <RequireAuth>{el}</RequireAuth>;
+const lazyEl = (el: ReactNode) => <Suspense fallback={<Loading rows={4} />}>{el}</Suspense>;
+const auth = (el: ReactNode) => <RequireAuth>{lazyEl(el)}</RequireAuth>;
 export const routes = [{
   path: '/', element: <Layout />, errorElement: <RouteError />,
   children: [
     { index: true, element: auth(<Dashboard />) },
     { path: 'learning', element: auth(<Learning />) },
     { path: 'learning/cards', element: auth(<CardsTrainer />) },
-    { path: 'protection', element: <Protection /> },
+    { path: 'protection', element: lazyEl(<Protection />) },
     { path: 'analytics', element: auth(<Analytics />) },
     { path: 'profile', element: auth(<Profile />) },
-    { path: 'login', element: <Login /> },
-    { path: 'register', element: <Register /> },
+    { path: 'login', element: lazyEl(<Login />) },
+    { path: 'register', element: lazyEl(<Register />) },
     { path: '*', element: <Crash notFound /> },
   ],
 }];

@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     max_body_bytes: int = 3_000_000
     cookie_name: str = "immunity_session"
     cookie_secure: bool = True  # в dev на http://localhost браузеры тоже принимают Secure-cookie
+    db_pool_size: int = Field(5, ge=1, le=50)  # соединений на процесс; всего = workers × (pool + overflow)
     org_min_group: int = Field(5, ge=2, le=50)  # меньше людей — сводку организации не показываем
 
     @field_validator("jwt_secret")

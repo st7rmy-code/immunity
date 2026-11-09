@@ -1,11 +1,15 @@
 """Точка входа API: uvicorn app.main:app"""
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.v1 import VERSION, router
 from app.core import errors
 from app.core.config import get_settings
+
+
+PUBLIC_CONTENT = {"/api/v1/scenarios", "/api/v1/skills", "/api/v1/audiences", "/api/v1/guides"}
 
 
 def create_app() -> FastAPI:
@@ -14,6 +18,7 @@ def create_app() -> FastAPI:
                   description="Модульный монолит MVP. ИИ-функции на сервере не подключены (нет AI Gateway).",
                   openapi_url="/api/v1/openapi.json", docs_url="/api/v1/docs", redoc_url=None)
     errors.install(app)
+    app.add_middleware(GZipMiddleware, minimum_size=1024)  # сценарии и памятки сжимаются в 5–8 раз
     if s.cors_origins:
         app.add_middleware(CORSMiddleware, allow_origins=s.cors_origins, allow_credentials=False,
                            allow_methods=["GET", "POST", "PATCH", "DELETE"], allow_headers=["Authorization", "Content-Type"])
@@ -26,8 +31,12 @@ def create_app() -> FastAPI:
         resp = await call_next(request)
         resp.headers.setdefault("X-Content-Type-Options", "nosniff")
         resp.headers.setdefault("Referrer-Policy", "no-referrer")
-        if request.url.path.startswith("/api/v1/") and not request.url.path.startswith("/api/v1/docs"):
-            resp.headers.setdefault("Cache-Control", "no-store")
+        path = request.url.path
+        if request.method == "GET" and resp.status_code == 200 and (path in PUBLIC_CONTENT or path.startswith("/api/v1/scenarios/")):
+            # справочный контент одинаков для всех: браузер и прокси могут хранить его 5 минут
+            resp.headers.setdefault("Cache-Control", "public, max-age=300")
+        elif path.startswith("/api/v1/") and not path.startswith("/api/v1/docs"):
+            resp.headers.setdefault("Cache-Control", "no-store")  # личные данные не кэшируются
         return resp
 
     app.include_router(router)

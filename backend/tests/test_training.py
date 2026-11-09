@@ -158,3 +158,17 @@ def test_card_answers_not_in_list_but_honest_flag_stored(client, db):
     assert len(cards) == 26
     honest = db.scalars(select(Scenario).where(Scenario.kind == "card", Scenario.honest)).all()
     assert 0 < len(honest) < 26
+
+
+def test_caching_headers_public_vs_private(client):
+    assert client.get(API + "/scenarios").headers["cache-control"] == "public, max-age=300"
+    assert client.get(API + "/scenarios/call/bank_safe").headers["cache-control"] == "public, max-age=300"
+    assert client.get(API + "/scenarios/call/nope").headers["cache-control"] == "no-store"  # ошибки не кэшируются
+    _, h = new_user(client)
+    assert client.get(API + "/attempts", headers=h).headers["cache-control"] == "no-store"
+    assert client.get(API + "/skills/me", headers=h).headers["cache-control"] == "no-store"
+
+
+def test_list_responses_are_gzipped(client):
+    r = client.get(API + "/scenarios", headers={"Accept-Encoding": "gzip"})
+    assert r.headers.get("content-encoding") == "gzip"

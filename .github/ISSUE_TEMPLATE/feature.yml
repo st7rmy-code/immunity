@@ -1,0 +1,19 @@
+name: Идея
+description: Новая функция или сценарий
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Какую проблему решает
+      description: Кому и в какой ситуации это поможет
+    validations: {required: true}
+  - type: textarea
+    id: idea
+    attributes:
+      label: Как это может выглядеть
+  - type: input
+    id: source
+    attributes:
+      label: Источник (для новой схемы мошенничества)
+      description: Ссылка на новость или документ с датой

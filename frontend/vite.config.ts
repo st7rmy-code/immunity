@@ -33,6 +33,19 @@ export default defineConfig({
   resolve: { alias: { '@': resolve(HERE, 'src') } },
   server: { port: 5173, proxy: { '/api': { target: API, changeOrigin: false } } },
   preview: { port: 4173, proxy: { '/api': { target: API, changeOrigin: false } } },
-  build: { sourcemap: true, target: 'es2022' },
+  build: {
+    sourcemap: 'hidden', target: 'es2022', // карты кода для отладки, но браузер их не запрашивает
+    // Библиотеки — отдельными файлами: они меняются редко и остаются в кэше браузера между выпусками.
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return;
+          if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'react';
+          if (id.includes('node_modules/react-router')) return 'router';
+          if (/node_modules\/(@tanstack|zustand)\//.test(id)) return 'query';
+        },
+      },
+    },
+  },
   test: { environment: 'jsdom', globals: true, setupFiles: ['./src/test/setup.ts'], css: false, include: ['src/**/*.test.{ts,tsx}'] },
 });
