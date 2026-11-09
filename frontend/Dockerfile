@@ -13,7 +13,7 @@ RUN npm ci --ignore-scripts --no-audit --no-fund
 COPY frontend/ ./
 RUN npm run build
 
-FROM nginx:1.27-alpine
+FROM nginx:1.31-alpine
 COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=web /f/dist /usr/share/nginx/html
 COPY --from=prototype /p/dist /usr/share/nginx/prototype
