@@ -1,0 +1,48 @@
+name: Сайт (GitHub Pages)
+# Публикует прототип тренажёра как статический сайт: https://<владелец>.github.io/<репозиторий>/
+# Всё работает в браузере, прогресс хранится только у посетителя. ИИ-функции на статическом сайте выключены
+# (нет сервера) — тренажёр честно об этом пишет и работает на правилах.
+# Новый интерфейс (frontend/) сюда не публикуется: ему нужен backend с базой данных.
+on:
+  push:
+    branches: [main]
+    paths: ["prototype/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 22}
+      - name: Сборка
+        working-directory: prototype
+        run: |
+          node build.mjs
+          # учебный сайт с вымышленными «банками» не должен попадать в поиск
+          sed -i 's#<head>#<head><meta name="robots" content="noindex,nofollow">#' dist/index.html
+          grep -q 'name="robots"' dist/index.html
+          touch dist/.nojekyll
+      - uses: actions/upload-pages-artifact@v3
+        with: {path: prototype/dist}
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
